@@ -3,6 +3,7 @@
 #include <Adafruit_GPS.h>
 #include <HardwareSerial.h>
 
+//deez nuts
 // ------------------- Temp Sensor Specifications -------------------
 
 #define TMP1075_ADDR 0x48   // Address is 48 NOT 49 like on excel sheet
