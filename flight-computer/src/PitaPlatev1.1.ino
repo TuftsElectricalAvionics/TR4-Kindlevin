@@ -23,7 +23,7 @@ bool fileReady = false;
 // ------------------- Temp Sensor Specifications -------------------
 
 #define TMP1075_ADDR 0x48   // Address is 48 NOT 49 like on excel sheet
-#define TMP1075_TEMP_REG 0x00
+#define TMP1075_TEMP_REG 0x00 // Given
 
 // function necessary for reading from sensor and converts it to Celcius
 float readTemperature() {
@@ -403,3 +403,5 @@ void loop() {
   
   delay(500);
 }
+
+
