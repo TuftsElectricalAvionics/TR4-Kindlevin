@@ -8,9 +8,6 @@
 #include <string.h>
 #include "sdkconfig.h"
 #include "esp_log.h"
-#include "esp_console.h"
-#include "esp_vfs_fat.h"
-#include "cmd_system.h"
 #include "cmd_i2ctools.h"
 #include "driver/i2c_master.h"
 
@@ -23,24 +20,6 @@ static i2c_port_t i2c_port = I2C_NUM_0;
 
 void app_main(void)
 {
-    //esp_console_repl_t *repl = NULL;
-    //esp_console_repl_config_t repl_config = ESP_CONSOLE_REPL_CONFIG_DEFAULT();
-    //repl_config.prompt = "i2c-tools>";
-
-    /*
-    // install console REPL environment
-#if CONFIG_ESP_CONSOLE_UART
-    esp_console_dev_uart_config_t uart_config = ESP_CONSOLE_DEV_UART_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_console_new_repl_uart(&uart_config, &repl_config, &repl));
-#elif CONFIG_ESP_CONSOLE_USB_CDC
-    esp_console_dev_usb_cdc_config_t cdc_config = ESP_CONSOLE_DEV_CDC_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_console_new_repl_usb_cdc(&cdc_config, &repl_config, &repl));
-#elif CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
-    esp_console_dev_usb_serial_jtag_config_t usbjtag_config = ESP_CONSOLE_DEV_USB_SERIAL_JTAG_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_console_new_repl_usb_serial_jtag(&usbjtag_config, &repl_config, &repl));
-#endif
-*/
-
     i2c_master_bus_config_t i2c_bus_config = {
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .i2c_port = i2c_port,
@@ -51,8 +30,6 @@ void app_main(void)
     };
 
     ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_config, &tool_bus_handle));
-
-    //register_i2ctools();
 
     printf("\n ==============================================================\n");
     printf(" |             Steps to Use i2c-tools                         |\n");
@@ -66,6 +43,5 @@ void app_main(void)
     printf(" |                                                            |\n");
     printf(" ==============================================================\n\n");
 
-    // start console REPL
-    //ESP_ERROR_CHECK(esp_console_start_repl(repl));
+    
 }
