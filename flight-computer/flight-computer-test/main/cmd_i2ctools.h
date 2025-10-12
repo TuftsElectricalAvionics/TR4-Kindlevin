@@ -12,7 +12,7 @@
 extern "C" {
 #endif
 
-void register_i2ctools(void);
+int do_i2cdetect_cmd();
 
 extern i2c_master_bus_handle_t tool_bus_handle;
 

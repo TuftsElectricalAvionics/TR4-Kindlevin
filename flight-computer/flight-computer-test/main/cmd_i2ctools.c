@@ -89,6 +89,7 @@ static int do_i2cconfig_cmd(int argc, char **argv)
     return 0;
 }
 
+/*
 static void register_i2cconfig(void)
 {
     i2cconfig_args.port = arg_int0(NULL, "port", "<0|1>", "Set the I2C bus port number");
@@ -105,8 +106,9 @@ static void register_i2cconfig(void)
     };
     ESP_ERROR_CHECK(esp_console_cmd_register(&i2cconfig_cmd));
 }
+    */
 
-static int do_i2cdetect_cmd(int argc, char **argv)
+int do_i2cdetect_cmd()
 {
     uint8_t address;
     printf("     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f\r\n");
@@ -130,6 +132,7 @@ static int do_i2cdetect_cmd(int argc, char **argv)
     return 0;
 }
 
+/*
 static void register_i2cdetect(void)
 {
     const esp_console_cmd_t i2cdetect_cmd = {
@@ -141,6 +144,7 @@ static void register_i2cdetect(void)
     };
     ESP_ERROR_CHECK(esp_console_cmd_register(&i2cdetect_cmd));
 }
+    */
 
 static struct {
     struct arg_int *chip_address;
@@ -203,6 +207,7 @@ static int do_i2cget_cmd(int argc, char **argv)
     return 0;
 }
 
+/*
 static void register_i2cget(void)
 {
     i2cget_args.chip_address = arg_int1("c", "chip", "<chip_addr>", "Specify the address of the chip on that bus");
@@ -218,6 +223,7 @@ static void register_i2cget(void)
     };
     ESP_ERROR_CHECK(esp_console_cmd_register(&i2cget_cmd));
 }
+    */
 
 static struct {
     struct arg_int *chip_address;
@@ -274,6 +280,7 @@ static int do_i2cset_cmd(int argc, char **argv)
     return 0;
 }
 
+/*
 static void register_i2cset(void)
 {
     i2cset_args.chip_address = arg_int1("c", "chip", "<chip_addr>", "Specify the address of the chip on that bus");
@@ -289,6 +296,7 @@ static void register_i2cset(void)
     };
     ESP_ERROR_CHECK(esp_console_cmd_register(&i2cset_cmd));
 }
+    */
 
 static struct {
     struct arg_int *chip_address;
@@ -369,6 +377,7 @@ static int do_i2cdump_cmd(int argc, char **argv)
     return 0;
 }
 
+/*
 static void register_i2cdump(void)
 {
     i2cdump_args.chip_address = arg_int1("c", "chip", "<chip_addr>", "Specify the address of the chip on that bus");
@@ -383,7 +392,9 @@ static void register_i2cdump(void)
     };
     ESP_ERROR_CHECK(esp_console_cmd_register(&i2cdump_cmd));
 }
+    */
 
+/*
 void register_i2ctools(void)
 {
     register_i2cconfig();
@@ -392,3 +403,4 @@ void register_i2ctools(void)
     register_i2cset();
     register_i2cdump();
 }
+*/
