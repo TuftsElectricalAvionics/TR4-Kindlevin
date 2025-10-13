@@ -1,0 +1,5 @@
+[wokwi]
+version = 1
+elf = "build/hodge-idf.elf"
+firmware = "build/hodge-idf.elf"
+gdbServerPort = 3333
