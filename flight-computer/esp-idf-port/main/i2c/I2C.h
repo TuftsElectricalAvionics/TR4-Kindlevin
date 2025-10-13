@@ -29,6 +29,9 @@ namespace seds {
         };
 
     public:
+        /// Returns a shared I2C bus object.
+        ///
+        /// Attempting to create multiple I2C buses will abort the program.
         static std::shared_ptr<I2C> create() {
             return std::make_shared<I2C>(Private());
         }
