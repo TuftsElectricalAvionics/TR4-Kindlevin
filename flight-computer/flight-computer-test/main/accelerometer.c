@@ -21,21 +21,21 @@ i2c_device *accel_device = NULL;
 int setup_accelerometer() {
     if (register_device(ACCEL_ADDRESS, &accel_device) != 0) {
         ESP_LOGE(TAG, "Failed to register accelerometer");
-        return -1; 
+        return 1; 
     }
 
     // Set resolution
     uint8_t resolution_data[1] = {RESOLUTION};
     if (i2cset(accel_device, REG_DATA_FORMAT, resolution_data, 1) != 0) {
         ESP_LOGE(TAG, "Failed to set resolution");
-        return -1; 
+        return 1; 
     }
 
     // Enable measurements
     uint8_t measure_data[1] = {MEASURE_BIT};
     if (i2cset(accel_device, REG_POWER_CTL, measure_data, 1) != 0) {
         ESP_LOGE(TAG, "Failed to enable measurements");
-        return -1; 
+        return 1; 
     }
 
     return 0; 
