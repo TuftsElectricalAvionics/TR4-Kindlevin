@@ -116,35 +116,23 @@ int free_device(i2c_device **dev) {
     return 0;
 }
 
-int i2cget(i2c_device *dev, int data_addr, int len)
+int i2cget(i2c_device *dev, int data_addr, uint8_t *data, int len)
 {
     if (len <= 0) {
         ESP_LOGE(TAG, "No data to read");
         return 1;
     }
-    uint8_t *data = malloc(len);
 
     esp_err_t ret = i2c_master_transmit_receive(dev->handle, (uint8_t*)&data_addr, 1, data, len, I2C_TOOL_TIMEOUT_VALUE_MS);
-    if (ret == ESP_OK) {
-        for (int i = 0; i < len; i++) {
-            printf("0x%02x ", data[i]);
-            if ((i + 1) % 16 == 0) {
-                printf("\r\n");
-            }
-        }
-        if (len % 16) {
-            printf("\r\n");
-        }
-    } else if (ret == ESP_ERR_TIMEOUT) {
+    if (ret == ESP_ERR_TIMEOUT) {
         ESP_LOGW(TAG, "Bus is busy");
     } else {
         ESP_LOGW(TAG, "Read failed");
     }
-    free(data);
     return 0;
 }
 
-int i2cset(i2c_device *dev, int data_addr, int *data, int len)
+int i2cset(i2c_device *dev, int data_addr, uint8_t *data, int len)
 {
 
     if (len <= 0) {

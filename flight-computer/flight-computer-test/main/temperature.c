@@ -25,8 +25,8 @@ float read_temperature() {
         return -273.15; // Return absolute zero as sentinel 
     }
 
-    uint8_t data[2] = {0};
-    if (i2cget(temp_sensor, TMP1075_TEMP_REG, 2) != 0) {
+    uint8_t data[2] = {0};  
+    if (i2cget(temp_sensor, TMP1075_TEMP_REG, data, 2) != 0) {
         ESP_LOGE(TAG, "Failed to read temperature data");
         return -273.15; // Error reading temperature
     }
