@@ -8,10 +8,10 @@
 #include <string.h>
 #include "sdkconfig.h"
 #include "esp_log.h"
-#include "cmd_i2ctools.h"
+#include "i2c_wrapper.h"
 #include "driver/i2c_master.h"
 
-static const char *TAG = "i2c-tools";
+static const char *TAG = "flight_computer_main";
 
 static gpio_num_t i2c_gpio_sda = CONFIG_EXAMPLE_I2C_MASTER_SDA;
 static gpio_num_t i2c_gpio_scl = CONFIG_EXAMPLE_I2C_MASTER_SCL;

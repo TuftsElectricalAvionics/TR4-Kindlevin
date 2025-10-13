@@ -18,9 +18,16 @@
 #include "esp_console.h"
 #include "esp_log.h"
 
-static const char *TAG = "cmd_i2ctools";
+static const char *TAG = "i2c_wrapper";
+
+typedef struct {
+    i2c_master_dev_handle_t handle;
+} i2c_device;
 
 #define I2C_TOOL_TIMEOUT_VALUE_MS (50)
+
+// We shouldn't need to chage in this *in* code, bc we can just change this value.
+// TODO: Is this a correct assumption?
 static uint32_t i2c_frequency = 100 * 1000;
 i2c_master_bus_handle_t tool_bus_handle;
 
@@ -34,8 +41,13 @@ static esp_err_t i2c_get_port(int port, i2c_port_t *i2c_port)
     return ESP_OK;
 }
 
-int i2cconfig(int i2c_port, int i2c_frequency, int i2c_gpio_sda, int i2c_gpio_scl)
+int i2cconfig(int i2c_port, int i2c_gpio_sda, int i2c_gpio_scl)
 {
+    i2c_port_t i2c_port_checked;
+    if (i2c_get_port(i2c_port, &i2c_port_checked) != ESP_OK) {
+        return 1;
+    }
+
     // re-init the bus
     if (i2c_del_master_bus(tool_bus_handle) != ESP_OK) {
         return 1;
@@ -81,7 +93,30 @@ int i2cdetect()
     return 0;
 }
 
-int i2cget(int chip_addr, int data_addr, int len)
+int register_device(int chip_addr, i2c_device **out) {
+    i2c_master_dev_handle_t dev_handle;
+    i2c_device_config_t i2c_dev_conf = {
+        .scl_speed_hz = i2c_frequency,
+        .device_address = chip_addr,
+    };
+    if (i2c_master_bus_add_device(tool_bus_handle, &i2c_dev_conf, &dev_handle) != ESP_OK) {
+        return 1;
+    }
+    *out = malloc(sizeof(i2c_device));
+    (*out)->handle = dev_handle;
+    return 0;
+}
+
+int free_device(i2c_device **dev) {
+    if (i2c_master_bus_rm_device((*dev)->handle) != ESP_OK) {
+        return 1;
+    }
+    free(*dev);
+    *dev = NULL;
+    return 0;
+}
+
+int i2cget(i2c_device *dev, int data_addr, int len)
 {
     if (len <= 0) {
         ESP_LOGE(TAG, "No data to read");
@@ -89,16 +124,7 @@ int i2cget(int chip_addr, int data_addr, int len)
     }
     uint8_t *data = malloc(len);
 
-    i2c_device_config_t i2c_dev_conf = {
-        .scl_speed_hz = i2c_frequency,
-        .device_address = chip_addr,
-    };
-    i2c_master_dev_handle_t dev_handle;
-    if (i2c_master_bus_add_device(tool_bus_handle, &i2c_dev_conf, &dev_handle) != ESP_OK) {
-        return 1;
-    }
-
-    esp_err_t ret = i2c_master_transmit_receive(dev_handle, (uint8_t*)&data_addr, 1, data, len, I2C_TOOL_TIMEOUT_VALUE_MS);
+    esp_err_t ret = i2c_master_transmit_receive(dev->handle, (uint8_t*)&data_addr, 1, data, len, I2C_TOOL_TIMEOUT_VALUE_MS);
     if (ret == ESP_OK) {
         for (int i = 0; i < len; i++) {
             printf("0x%02x ", data[i]);
@@ -115,13 +141,10 @@ int i2cget(int chip_addr, int data_addr, int len)
         ESP_LOGW(TAG, "Read failed");
     }
     free(data);
-    if (i2c_master_bus_rm_device(dev_handle) != ESP_OK) {
-        return 1;
-    }
     return 0;
 }
 
-int i2cset(int chip_addr, int data_addr, int *data, int len)
+int i2cset(i2c_device *dev, int data_addr, int *data, int len)
 {
 
     if (len <= 0) {
@@ -133,21 +156,12 @@ int i2cset(int chip_addr, int data_addr, int *data, int len)
         return 1;
     }
 
-    i2c_device_config_t i2c_dev_conf = {
-        .scl_speed_hz = i2c_frequency,
-        .device_address = chip_addr,
-    };
-    i2c_master_dev_handle_t dev_handle;
-    if (i2c_master_bus_add_device(tool_bus_handle, &i2c_dev_conf, &dev_handle) != ESP_OK) {
-        return 1;
-    }
-
     uint8_t *data_buf = malloc(len + 1);
     data[0] = data_addr;
     for (int i = 0; i < len; i++) {
         data_buf[i + 1] = data[i];
     }
-    esp_err_t ret = i2c_master_transmit(dev_handle, data_buf, len + 1, I2C_TOOL_TIMEOUT_VALUE_MS);
+    esp_err_t ret = i2c_master_transmit(dev->handle, data_buf, len + 1, I2C_TOOL_TIMEOUT_VALUE_MS);
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "Write OK");
     } else if (ret == ESP_ERR_TIMEOUT) {
@@ -157,25 +171,13 @@ int i2cset(int chip_addr, int data_addr, int *data, int len)
     }
 
     free(data);
-    if (i2c_master_bus_rm_device(dev_handle) != ESP_OK) {
-        return 1;
-    }
     return 0;
 }
 
-int i2cdump(int chip_addr, int size)
+int i2cdump(i2c_device *dev, int size)
 {
     if (size != 1 && size != 2 && size != 4) {
         ESP_LOGE(TAG, "Wrong read size. Only support 1,2,4");
-        return 1;
-    }
-
-    i2c_device_config_t i2c_dev_conf = {
-        .scl_speed_hz = i2c_frequency,
-        .device_address = chip_addr,
-    };
-    i2c_master_dev_handle_t dev_handle;
-    if (i2c_master_bus_add_device(tool_bus_handle, &i2c_dev_conf, &dev_handle) != ESP_OK) {
         return 1;
     }
 
@@ -189,7 +191,7 @@ int i2cdump(int chip_addr, int size)
         for (int j = 0; j < 16; j += size) {
             fflush(stdout);
             data_addr = i + j;
-            esp_err_t ret = i2c_master_transmit_receive(dev_handle, &data_addr, 1, data, size, I2C_TOOL_TIMEOUT_VALUE_MS);
+            esp_err_t ret = i2c_master_transmit_receive(dev->handle, &data_addr, 1, data, size, I2C_TOOL_TIMEOUT_VALUE_MS);
             if (ret == ESP_OK) {
                 for (int k = 0; k < size; k++) {
                     printf("%02x ", data[k]);
@@ -216,9 +218,6 @@ int i2cdump(int chip_addr, int size)
             }
         }
         printf("\r\n");
-    }
-    if (i2c_master_bus_rm_device(dev_handle) != ESP_OK) {
-        return 1;
     }
     return 0;
 }
