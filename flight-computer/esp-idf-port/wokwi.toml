@@ -1,5 +1,5 @@
 [wokwi]
 version = 1
-elf = "build/hodge-idf.elf"
-firmware = "build/hodge-idf.elf"
+elf = "build/kindlevan.elf"
+firmware = "build/kindlevan.elf"
 gdbServerPort = 3333

@@ -24,7 +24,7 @@ If you want to use an actual line-by-line debugger with breakpoints and everythi
       "name": "Wokwi GDB",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/build/hodge-idf.elf",
+      "program": "${workspaceFolder}/build/kindlevan.elf",
       "cwd": "${workspaceFolder}",
       "MIMode": "gdb",
       // Change to your username / home directory
