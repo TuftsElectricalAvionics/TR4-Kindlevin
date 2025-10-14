@@ -13,7 +13,7 @@ We can get realistic data from CFD simulations or even better, wind tunnels.
 
 * MAC or Windows OS
 * Need Python installed
-* Need RocketPy installed on whatever code editor you use (I used Thonny)
+* Need RocketPy installed on whatever code editor you use (I used Thonny) (You could also use VSCODE but probably would have to make a virtual environement)
 
 ### Installing
 
