@@ -5,7 +5,7 @@ Simulates airbreaks to model their data.
 ## Description
 
 I have used the starter code from RocketPy to obtain a 3D model of airbreak's characteristics from sample test data online.
-We can get realistic data from CFD simulations or even better, wind tunnels.
+We can get realistic data from simulations or even better, wind tunnels.
 
 ## Getting Started
 
