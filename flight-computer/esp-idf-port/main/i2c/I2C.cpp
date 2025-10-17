@@ -30,7 +30,7 @@ namespace seds {
         ESP_ERROR_CHECK(i2c_del_master_bus(this->handle()));
     }
 
-    Result<I2CDevice> I2C::get_device(uint16_t address) {
+    Expected<I2CDevice> I2C::get_device(uint16_t address) {
         auto [_, did_insert] = this->used_addresses.insert(address);
 
         // Don't allow duplicate devices to prevent two subsystems writing to the same place
