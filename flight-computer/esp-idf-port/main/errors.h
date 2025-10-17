@@ -26,7 +26,7 @@
     if (!result.has_value()) {                                                                      \
         return std::unexpected(std::move(result).error());                                          \
     }                                                                                               \
-    std::move(result.value());                                                                      \
+    std::move(result).value();                                                                      \
 })
 
 namespace seds::errors {
