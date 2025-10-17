@@ -33,7 +33,7 @@ namespace seds::errors {
     /// Contains either a value or an error. An alias for std::expected with a dynamically-typed
     /// error.
     template<typename T>
-    using Result = std::expected<T, std::unique_ptr<std::exception>>;
+    using Expected = std::expected<T, std::unique_ptr<std::exception>>;
 
     /// An error sourced from ESP-IDF.
     class EspError final : public std::runtime_error {
@@ -46,7 +46,7 @@ namespace seds::errors {
     /// This function should be used to prevent further execution in the event of an
     /// unrecoverable error.
     template<typename T>
-    T unwrap(Result<T>&& expected) {
+    T unwrap(Expected<T>&& expected) {
         if (expected.has_value()) {
             return std::move(*expected);
         }

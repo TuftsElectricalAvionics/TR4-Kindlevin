@@ -5,6 +5,8 @@
 #include <chrono>
 #include <algorithm>
 #include <string>
+#include <bit>
+#include <type_traits>
 
 #include "driver/i2c_types.h"
 #include "driver/i2c_master.h"
@@ -12,6 +14,7 @@
 #include "freertos/FreeRTOS.h"
 #include "errors.h"
 #include "esp_log.h"
+#include "utils.h"
 
 namespace seds {
     using namespace std::chrono_literals;
@@ -47,11 +50,11 @@ namespace seds {
         ///
         /// Returns an error if the caller tried to create two devices with the same address.
         [[nodiscard]]
-        Result<I2CDevice> get_device(uint16_t address);
+        Expected<I2CDevice> get_device(uint16_t address);
 
         /// Returns a handle to an I2C device using its default address.
         template<typename Device>
-        Result<Device> get_device() {
+        Expected<Device> get_device() {
             ESP_LOGI("i2c", "Getting device with address %x", Device::default_address);
             auto handle = TRY(this->get_device(Device::default_address));
             ESP_LOGI("i2c", "Got device");
@@ -86,10 +89,10 @@ namespace seds {
 
         ~I2CDevice();
 
-        /// Performs a write-read transaction on the I2C bus. The given byte buffer is written
+        /// Perform a write-read transaction on the I2C bus. The given byte buffer is written
         /// to the device and then `ReadN` bytes are read back.
         template<size_t ReadN, size_t WriteN>
-        Result<std::array<uint8_t, ReadN>> write_read(
+        Expected<std::array<uint8_t, ReadN>> write_read(
             std::array<uint8_t, WriteN> const& write_buf
         ) {
             std::array<uint8_t, ReadN> read_buf;
@@ -110,19 +113,59 @@ namespace seds {
             return read_buf;
         }
 
-        /// Reads the data at the given register from the I2C device.
+        /// Write a byte buffer to the I2C bus. No bytes are read back.
+        template<size_t WriteN>
+        [[nodiscard]]
+        Expected<std::monostate> write(
+            std::array<uint8_t, WriteN> const& write_buf
+        ) {
+            ESP_TRY(
+                i2c_master_transmit(
+                    this->handle(),
+                    write_buf.data(),
+                    write_buf.size(),
+                    // I'm not totally sure why we need to divide by the tick period here, but it
+                    // was in the I2C example.
+                    timeout.count() / portTICK_PERIOD_MS
+                )
+            );
+
+            return std::monostate {};
+        }
+
+        /// Read a big-endian number from the given register of this I2C device.
+        ///
+        /// To make it easier to keep track of register constants, you can pass in a custom register
+        /// enum variant as long as it can be statically cast to a `uint8_t`.
         template<typename ReadT, typename RegisterT>
         [[nodiscard]]
-        Result<ReadT> read_register(RegisterT reg) {
+        Expected<ReadT> read_be_register(RegisterT const reg) {
+            static_assert(std::is_arithmetic_v<ReadT>, "ReadT must be a number");
+
             auto write_buf = std::array { static_cast<uint8_t>(reg) };
             auto read_buf = TRY(this->write_read<sizeof(ReadT)>(write_buf));
 
-            // We reverse the order of the bytes because I2C uses big-endian, but we want
-            // little-endian as that's what our CPU uses.
-            std::ranges::reverse(read_buf);
+            return num::from_be_bytes<ReadT>(read_buf);
+        }
 
-            // Cast the byte buffer to the actual integer type now.
-            return std::bit_cast<ReadT>(read_buf);
+        /// Write a big-endian number to the given register of this I2C device.
+        ///
+        /// To make it easier to keep track of register constants, you can pass in a custom register
+        /// enum variant as long as it can be statically cast to a `uint8_t`.
+        template<typename WriteT, typename RegisterT>
+        [[nodiscard]]
+        Expected<std::monostate> write_be_register(RegisterT const reg, WriteT const new_value) {
+            static_assert(std::is_arithmetic_v<WriteT>, "WriteT must be a number");
+
+            std::array<uint8_t, 1 + sizeof(WriteT)> write_buf = {
+                static_cast<uint8_t>(reg),
+                // ...temporarily unfilled
+            };
+
+            // Write new value's bytes into the write buffer.
+            std::ranges::copy(num::to_be_bytes(new_value), &write_buf[1]);
+
+            return this->write(write_buf);
         }
 
         [[nodiscard]]
