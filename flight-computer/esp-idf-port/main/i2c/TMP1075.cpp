@@ -15,11 +15,62 @@ namespace seds {
         DIEID = 0x0F,
     };
 
-    TMP1075::TMP1075(I2CDevice&& device) : device(std::move(device)) {
+    TMP1075::TMP1075(I2CDevice&& device) :
+        device(std::move(device)) {
         ESP_LOGI("TMP1075", "Temp sensor created");
     }
 
-    Result<float> TMP1075::read_temperature() {
-        return TRY(this->device.read_register<float>(TMP1075Register::TEMP));
+    bool TMP1075::is_connected() {
+        constexpr uint16_t device_id = 0x7500; // 75 for TMP1075
+
+        auto const reg = this->device.read_be_register<uint16_t>(TMP1075Register::DIEID);
+        if (!reg.has_value()) {
+            return false;
+        }
+
+        return reg.value() == device_id;
+    }
+
+    Expected<float> TMP1075::read_temperature() {
+        // https://www.ti.com/lit/an/sbaa588a/sbaa588a.pdf?ts=1760629136511
+
+        // Bits 15-4 contain signed big-endian temperature, 3-0 are unused
+        auto const reg = TRY(this->device.read_be_register<uint16_t>(TMP1075Register::TEMP));
+
+        // Move the entire int down into the first few bytes. It becomes signed afterward.
+        auto temp_raw = static_cast<int16_t>(reg >> 4);
+
+        // If bit 11 (the register's sign bit) is set, then flip the bits at the top to
+        // maintain the sign.
+        // (This used to be bit 15 before we shifted everything down.)
+        if (temp_raw & 1 << 11) {
+            temp_raw |= static_cast<int16_t>(0xF000);
+        }
+
+        // Apply resolution scaling factor specified in data sheet
+        return static_cast<float>(temp_raw) * 0.0625f;
+    }
+
+    constexpr uint8_t ONESHOT_OFFSET = 15;
+    constexpr uint8_t RATE_OFFSET = 13;
+    constexpr uint8_t SHUTDOWN_OFFSET = 8;
+
+    Expected<std::monostate> TMP1075::write_config(Config const& config, bool const do_oneshot) {
+        uint16_t config_data = 0;
+
+        config_data |= do_oneshot << ONESHOT_OFFSET;
+        config_data |= static_cast<uint8_t>(config.rate) << RATE_OFFSET;
+        config_data |= config.is_shutdown << SHUTDOWN_OFFSET;
+
+        return this->device.write_be_register(TMP1075Register::CFGR, config_data);
+    }
+
+    Expected<TMP1075::Config> TMP1075::read_config() {
+        auto const reg = TRY(this->device.read_be_register<uint16_t>(TMP1075Register::CFGR));
+
+        return Config {
+            .rate = static_cast<Rate>(reg >> RATE_OFFSET & 0b11),
+            .is_shutdown = (reg >> SHUTDOWN_OFFSET & 0b1) == 1,
+        };
     }
 }
