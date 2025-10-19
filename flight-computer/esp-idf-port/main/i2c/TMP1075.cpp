@@ -35,17 +35,10 @@ namespace seds {
         // https://www.ti.com/lit/an/sbaa588a/sbaa588a.pdf?ts=1760629136511
 
         // Bits 15-4 contain signed big-endian temperature, 3-0 are unused
-        auto const reg = TRY(this->device.read_be_register<uint16_t>(TMP1075Register::TEMP));
+        auto temp_raw = TRY(this->device.read_be_register<int16_t>(TMP1075Register::TEMP));
 
-        // Move the entire int down into the first few bytes. It becomes signed afterward.
-        auto temp_raw = static_cast<int16_t>(reg >> 4);
-
-        // If bit 11 (the register's sign bit) is set, then flip the bits at the top to
-        // maintain the sign.
-        // (This used to be bit 15 before we shifted everything down.)
-        if (temp_raw & 1 << 11) {
-            temp_raw |= static_cast<int16_t>(0xF000);
-        }
+        // Move the entire int down into the first few bytes. (Sign extension is automatic.)
+        temp_raw >>= 4;
 
         // Apply resolution scaling factor specified in data sheet
         return static_cast<float>(temp_raw) * 0.0625f;
