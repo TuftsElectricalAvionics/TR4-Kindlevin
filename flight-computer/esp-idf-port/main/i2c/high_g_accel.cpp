@@ -23,7 +23,7 @@ namespace seds {
 
         /// Initialize the accelerometer: Full resolution, ±200g
         TRY(
-            accel.device.write_register<uint8_t>(
+            accel.device.write_be_register<uint8_t>(
                 ADXL375Register::DATA_FORMAT,
                 0x0F
             )
@@ -31,7 +31,7 @@ namespace seds {
 
         /// Set measure bit to start measurements
         TRY(
-            accel.device.write_register<uint8_t>(
+            accel.device.write_be_register<uint8_t>(
                 ADXL375Register::POWER_CTL,
                 0x08
             )
@@ -45,17 +45,17 @@ namespace seds {
     bool HighGAccel::is_connected() {
         constexpr uint16_t device_id = 0xE5; // 75 for ADXL345
 
-        auto result = this->device.read_register<uint8_t>(ADXL375Register::DEVID);
+        auto result = this->device.read_be_register<uint8_t>(ADXL375Register::DEVID);
         return result.has_value() && result.value() == device_id;
     }
 
     
     Result<HighGAccelData> HighGAccel::read_acceleration() {
         /// These are stored in little-endian format
-        /// FIXME: Use updated read functions in feat/temp branch
-        auto x = TRY(this->device.read_register<int16_t>(ADXL375Register::DATAX0));
-        auto y = TRY(this->device.read_register<int16_t>(ADXL375Register::DATAY0));
-        auto z = TRY(this->device.read_register<int16_t>(ADXL375Register::DATAZ0));
+        /// FIXME: Make new I2C function
+        auto x = TRY(this->device.read_le_register<int16_t>(ADXL375Register::DATAX0));
+        auto y = TRY(this->device.read_le_register<int16_t>(ADXL375Register::DATAY0));
+        auto z = TRY(this->device.read_le_register<int16_t>(ADXL375Register::DATAZ0));
 
         HighGAccelData data;
         data.h_ax = static_cast<float>(x) / HIGH_G_ACCEL_SENS;
