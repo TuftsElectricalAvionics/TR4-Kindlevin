@@ -11,8 +11,13 @@ namespace seds {
     public:
         static constexpr int16_t default_address = 0x48;
 
-        /// Move constructor deletes default constructor and copy constructor.
         explicit TMP1075(I2CDevice&& device);
+
+        // No copies allowed since we hold unique state
+        TMP1075(TMP1075&&) = default;
+        TMP1075& operator=(TMP1075&&) = default;
+        TMP1075(TMP1075 const&) = delete;
+        TMP1075& operator=(TMP1075 const&) = delete;
 
         /// Determines how often temperature is sampled. The device's current draw is lower between
         /// samples, when it is in standby mode.
