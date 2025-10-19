@@ -53,6 +53,10 @@ namespace seds {
         }
 
         /// Instruct the device to update its reading even though it is in shutdown mode.
+        ///
+        /// The process of taking the measurement takes around 5ms. If you're using this API
+        /// you might want to figure out a way to get a notification on completion, or do stuff
+        /// in the background for 5ms, or just block for that time.
         Expected<std::monostate> take_sample() {
             return this->write_config(this->current_config, true);
         }
