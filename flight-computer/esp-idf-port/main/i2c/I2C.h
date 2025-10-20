@@ -168,6 +168,43 @@ namespace seds {
             return this->write(write_buf);
         }
 
+        /// Read a little-endian number from the given register of this I2C device.
+        ///
+        /// To make it easier to keep track of register constants, you can pass in a custom register
+        /// enum variant as long as it can be statically cast to a `uint8_t`.
+        template<typename ReadT, typename RegisterT>
+        [[nodiscard]]
+        Expected<ReadT> read_le_register(RegisterT const reg) {
+            static_assert(std::is_arithmetic_v<ReadT>, "ReadT must be a number");
+
+            auto write_buf = std::array { static_cast<uint8_t>(reg) };
+            auto read_buf = TRY(this->write_read<sizeof(ReadT)>(write_buf));
+
+            return num::from_le_bytes<ReadT>(read_buf);
+        }
+
+        /// Write a little-endian number to the given register of this I2C device.
+        ///
+        /// To make it easier to keep track of register constants, you can pass in a custom register
+        /// enum variant as long as it can be statically cast to a `uint8_t`.
+        template<typename WriteT, typename RegisterT>
+        [[nodiscard]]
+        Expected<std::monostate> write_le_register(RegisterT const reg, WriteT const new_value) {
+            static_assert(std::is_arithmetic_v<WriteT>, "WriteT must be a number");
+
+            std::array<uint8_t, 1 + sizeof(WriteT)> write_buf = {
+                static_cast<uint8_t>(reg),
+                // ...temporarily unfilled
+            };
+
+            // Write new value's bytes into the write buffer.
+            std::ranges::copy(num::to_le_bytes(new_value), &write_buf[1]);
+
+            return this->write(write_buf);
+        }
+
+
+
         [[nodiscard]]
         std::shared_ptr<I2C> get_bus() const {
             return this->bus;
