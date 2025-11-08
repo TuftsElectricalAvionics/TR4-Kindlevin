@@ -17,12 +17,12 @@ namespace seds {
 
         /// Should this function initialize reading?
         [[nodiscard]]
-        static Result<HighGAccel> create(I2CDevice&& device);
+        static Expected<HighGAccel> create(I2CDevice&& device);
 
         bool is_connected();
 
         [[nodiscard]]
-        Result<HighGAccelData> read_acceleration();
+        Expected<HighGAccelData> read_acceleration();
 
     private:
         explicit HighGAccel(I2CDevice&& device);

@@ -15,21 +15,60 @@ namespace seds {
 
     class BMI323 {
     public:
+        // Is this an understandable way to do this?
+        enum class SensorHz : uint16_t {
+            __78125 = 0x1,
+            _1_5625 = 0x2,
+            _3_125 = 0x3,
+            _6_25 = 0x4,
+            _12_5 = 0x5,
+            _25 = 0x6,
+            _50 = 0x7,
+            _100 = 0x8,
+            _200 = 0x9,
+            _400 = 0xA,
+            _800 = 0xB,
+            _1600 = 0xC,
+            _3200 = 0xD,
+            _6400 = 0xE,
+        }
+
+        enum class AccelRange : uint16_t {
+            _2G = 0x0,
+            _4G = 0x1,
+            _8G = 0x2,
+            _16G = 0x3,
+        };
+
+        enum class GyroRange : uint16_t {
+            _125DPS = 0x0,
+            _250DPS = 0x1,
+            _500DPS = 0x2,
+            _1000DPS = 0x3,
+            _2000DPS = 0x4,
+        };
+
         static constexpr int16_t default_address = 0x68;
 
         [[nodiscard]]
-        static Result<BMI323> create(I2CDevice&& device);
+        static Expected<BMI323> create(I2CDevice&& device);
 
         bool is_connected();
 
         [[nodiscard]]
-        Result<IMUData> read_imu();
+        Expected<std::monostate> set_accel_range(AccelRange range);
+
+        [[nodiscard]]
+        Expected<std::monostate> set_gyro_range(GyroRange range);
+
+        [[nodiscard]]
+        Expected<IMUData> read_imu();
     private:
         explicit BMI323(I2CDevice&& device);
 
         I2CDevice device;
-        // should these be 0 sentinel values instead?
-        float accel_sens = 4100.; // LSB/g (actually 4.1 LSB/mg)
-        float gyro_sens = 65.536;    // LSB/°/s
+        AccelRange accel_range; 
+        GyroRange gyro_range;    
+        SensorHz sensor_hz;
     }
 }
