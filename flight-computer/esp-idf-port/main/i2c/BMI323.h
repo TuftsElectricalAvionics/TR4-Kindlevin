@@ -62,9 +62,19 @@ namespace seds {
         Expected<std::monostate> set_gyro_range(GyroRange range);
 
         [[nodiscard]]
+        Expected<std::monostate> set_sensor_hz(SensorHz hz);
+
+        [[nodiscard]]
         Expected<IMUData> read_imu();
+        
     private:
         explicit BMI323(I2CDevice&& device);
+
+        [[nodiscard]]
+        Expected<std::monostate> write_accel_config(AccelRange range, SensorHz hz);
+
+        [[nodiscard]]
+        Expected<std::monostate> write_gyro_config(GyroRange range, SensorHz hz);
 
         I2CDevice device;
         AccelRange accel_range; 

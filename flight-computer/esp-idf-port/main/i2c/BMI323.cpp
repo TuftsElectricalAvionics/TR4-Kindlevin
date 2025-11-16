@@ -31,37 +31,42 @@ namespace seds {
 
     BMI323::BMI323(I2CDevice&& device) : device(std::move(device)) {}
 
-    Expected<BMI323> BMI323::create(I2CDevice&& device) {
-        auto imu = BMI323(std::move(device));
-
-        // configuration
-        // should we make this changeable on the fly?
-        uint16_t acc_range = AccelRange::_2G; // +/- 8g
-        uint16_t acc_hz = SensorHz::_100; // 100Hz
+    Expected<std::monostate> BMI323::write_accel_config(AccelRange range, SensorHz hz) {
         uint16_t acc_mode = 0x4; // normal mode
-
-        uint16_t acc_cfg = (acc_mode << 12) | (acc_range << 4) | acc_hz;
+        uint16_t acc_cfg = (acc_mode << 12) | (static_cast<uint16_t>(range) << 4) | static_cast<uint16_t>(hz);
 
         TRY(
-            imu.device.write_le_register<uint16_t>(
+            this->device.write_le_register<uint16_t>(
                 BMI323Register::ACC_CFG,
                 acc_cfg
             )
         );
 
-        uint16_t gyr_range = GyroRange::_500DPS; // +/- 500dps
-        uint16_t gyr_hz = SensorHz::_100; // 100Hz
-        uint16_t gyr_mode = 0x4; // normal mode
+        return std::monostate {};
+    }
 
-        uint16_t gyr_cfg = (gyr_mode << 12) | (gyr_range << 4) | gyr_hz;
+    Expected<std::monostate> BMI323::write_gyro_config(GyroRange range, SensorHz hz) {
+        uint16_t gyr_mode = 0x4; // normal mode
+        uint16_t gyr_cfg = (gyr_mode << 12) | (static_cast<uint16_t>(range) << 4) | static_cast<uint16_t>(hz);
 
         TRY(
-            imu.device.write_le_register<uint16_t>(
+            this->device.write_le_register<uint16_t>(
                 BMI323Register::GYR_CFG,
                 gyr_cfg
             )
         );
 
+        return std::monostate {};
+    }
+
+    Expected<BMI323> BMI323::create(I2CDevice&& device) {
+        auto imu = BMI323(std::move(device));
+
+        TRY(imu.write_accel_config(imu.accel_range, imu.sensor_hz));
+        TRY(imu.write_gyro_config(imu.gyro_range, imu.sensor_hz));
+
+        // Set configuration after write in case of failure
+        // This is why the writing functions take parameters rather than using the member variables directly
         imu.accel_range = AccelRange::_8G;
         imu.gyro_range = GyroRange::_500DPS;
         imu.sensor_hz = SensorHz::_100;
@@ -79,39 +84,26 @@ namespace seds {
     }   
 
     Expected<std::monostate> BMI323::set_accel_range(AccelRange range) {
-        uint16_t acc_range = static_cast<uint16_t>(range);
-        uint16_t acc_hz = this->sensor_hz; // 100Hz
-        uint16_t acc_mode = 0x4; // normal mode
+        TRY(this->write_accel_config(range, this->sensor_hz));
 
-        uint16_t acc_cfg = (acc_mode << 12) | (acc_range << 4) | acc_hz;
-
-        TRY(
-            this->device.write_le_register<uint16_t>(
-                BMI323Register::ACC_CFG,
-                acc_cfg
-            )
-        );
-
-        this->accel_range = range;
+        this->accel_range = range; 
 
         return std::monostate {};
     }
 
     Expected<std::monostate> BMI323::set_gyro_range(GyroRange range) {
-        uint16_t gyr_range = static_cast<uint16_t>(range);
-        uint16_t gyr_hz = this->sensor_hz; // 100Hz
-        uint16_t gyr_mode = 0x4; // normal mode
-
-        uint16_t gyr_cfg = (gyr_mode << 12) | (gyr_range << 4) | gyr_hz;
-
-        TRY(
-            this->device.write_le_register<uint16_t>(
-                BMI323Register::GYR_CFG,
-                gyr_cfg
-            )
-        );
+        TRY(this->write_gyro_config(range, this->sensor_hz));
 
         this->gyro_range = range;
+
+        return std::monostate {};
+    }
+
+    Expected<std::monostate> BMI323::set_sensor_hz(SensorHz hz) {
+        TRY(this->write_accel_config(this->accel_range, hz));
+        TRY(this->write_gyro_config(this->gyro_range, hz));
+
+        this->sensor_hz = hz;
 
         return std::monostate {};
     }
