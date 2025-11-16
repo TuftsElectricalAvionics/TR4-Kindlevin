@@ -53,6 +53,11 @@ namespace seds {
         [[nodiscard]]
         static Expected<BMI323> create(I2CDevice&& device);
 
+        BMI323(BMI323&&) = default;
+        BMI323& operator=(BMI323&&) = default;
+        BMI323(BMI323 const&) = delete;
+        BMI323& operator=(BMI323 const&) = delete;
+
         bool is_connected();
 
         [[nodiscard]]
