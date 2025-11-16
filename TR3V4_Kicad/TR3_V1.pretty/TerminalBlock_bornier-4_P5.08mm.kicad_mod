@@ -1,0 +1,274 @@
+(footprint "TerminalBlock_bornier-4_P5.08mm"
+	(version 20240108)
+	(generator "pcbnew")
+	(generator_version "8.0")
+	(layer "F.Cu")
+	(descr "simple 4-pin terminal block, pitch 5.08mm, revamped version of bornier4")
+	(tags "terminal block bornier4")
+	(property "Reference" "REF**"
+		(at 7.6 -4.8 0)
+		(layer "F.SilkS")
+		(uuid "9a519dd0-3e03-4dab-9569-efac58fdea9b")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "Screw_Terminal_01x04"
+		(at 7.6 4.75 0)
+		(layer "F.Fab")
+		(uuid "a530fdeb-af9f-4cfe-87c4-9ccacb0fe4a4")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Footprint" "TerminalBlock:TerminalBlock_bornier-4_P5.08mm"
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "9ba7fb28-35a5-46e0-a573-ecb746e09c70")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "172d88ed-dd0b-4d03-b107-951f14041d0f")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" "Generic screw terminal, single row, 01x04, script generated (kicad-library-utils/schlib/autogen/connector/)"
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "74d64fda-10ca-482f-889a-7616068b4ca2")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr through_hole)
+	(fp_line
+		(start -2.54 -3.81)
+		(end -2.54 3.81)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "fc3e1854-3868-49c1-9845-750008d1b819")
+	)
+	(fp_line
+		(start -2.54 -3.81)
+		(end 17.78 -3.81)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "57ee1f27-298e-4624-b87a-79327975ea68")
+	)
+	(fp_line
+		(start -2.54 3.81)
+		(end 17.78 3.81)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "2891afea-fa32-444f-8213-cc3f1da94ed4")
+	)
+	(fp_line
+		(start 17.78 2.54)
+		(end -2.54 2.54)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "0b5aec03-578f-4c5b-a13d-2be731c33b2b")
+	)
+	(fp_line
+		(start 17.78 3.81)
+		(end 17.78 -3.81)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "c79d48a5-b4ce-46d5-bc32-3630af00eee8")
+	)
+	(fp_line
+		(start -2.73 -4)
+		(end -2.73 4)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "17dfa7f5-8c3c-4c32-b7b5-b7474c7a57d9")
+	)
+	(fp_line
+		(start -2.73 -4)
+		(end 17.97 -4)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "70d927a8-025b-4598-97cc-308f932eba00")
+	)
+	(fp_line
+		(start 17.97 4)
+		(end -2.73 4)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "1c5c2b18-c99a-4476-bea9-2aba62ee2255")
+	)
+	(fp_line
+		(start 17.97 4)
+		(end 17.97 -4)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "734fc73d-f729-47cb-87ae-6122170ed9ed")
+	)
+	(fp_line
+		(start -2.48 -3.75)
+		(end 17.72 -3.75)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "189e1192-bec9-4c86-8018-64544e79c8a8")
+	)
+	(fp_line
+		(start -2.48 2.55)
+		(end 17.72 2.55)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "ef9b2077-10f0-4d55-8686-eaaddf0dbca1")
+	)
+	(fp_line
+		(start -2.48 3.75)
+		(end -2.48 -3.75)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "f621f0d7-5ea1-44a0-9741-85ab3503b5df")
+	)
+	(fp_line
+		(start -2.43 3.75)
+		(end -2.48 3.75)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "3022265d-354a-4720-9150-f399b95e9c2d")
+	)
+	(fp_line
+		(start 17.72 -3.75)
+		(end 17.72 3.75)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "acf8cfe2-7a80-4269-95a7-ef0041a61df8")
+	)
+	(fp_line
+		(start 17.72 3.75)
+		(end -2.43 3.75)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "ab1be060-4660-4449-8c17-abd65bdbf340")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 7.62 0 0)
+		(layer "F.Fab")
+		(uuid "db32cbe0-3e04-4083-9580-02909e81ff5b")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(pad "1" thru_hole rect
+		(at 0 0)
+		(size 3 3)
+		(drill 1.52)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "be606f05-34bc-4b1e-9eac-d2b776634288")
+	)
+	(pad "2" thru_hole circle
+		(at 5.08 0)
+		(size 3 3)
+		(drill 1.52)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "accc892a-c963-49a3-948d-85300ad33ac8")
+	)
+	(pad "3" thru_hole circle
+		(at 10.16 0)
+		(size 3 3)
+		(drill 1.52)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "ec634d50-1563-49b9-a1ac-2e20fff8c4df")
+	)
+	(pad "4" thru_hole circle
+		(at 15.24 0)
+		(size 3 3)
+		(drill 1.52)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "4dfb8c02-7b01-493e-866e-1b8cffd28414")
+	)
+	(model "${KICAD8_3DMODEL_DIR}/TerminalBlock.3dshapes/TerminalBlock_bornier-4_P5.08mm.wrl"
+		(offset
+			(xyz 7.619999886 0 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 0)
+		)
+	)
+)
