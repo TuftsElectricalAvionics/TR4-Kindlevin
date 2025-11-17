@@ -18,7 +18,7 @@ namespace seds {
 
     HighGAccel::HighGAccel(I2CDevice&& device) : device(std::move(device)) {}
 
-    static Result<HighGAccel> HighGAccel::create(I2CDevice&& device)  {
+    static Expected<HighGAccel> HighGAccel::create(I2CDevice&& device)  {
         auto accel = HighGAccel(std::move(device));
 
         /// Initialize the accelerometer: Full resolution, ±200g
@@ -50,7 +50,7 @@ namespace seds {
     }
 
     
-    Result<HighGAccelData> HighGAccel::read_acceleration() {
+    Expected<HighGAccelData> HighGAccel::read_acceleration() {
         /// These are stored in little-endian format
         /// FIXME: Make new I2C function
         auto x = TRY(this->device.read_le_register<int16_t>(ADXL375Register::DATAX0));
