@@ -2,6 +2,7 @@
 
 #include "driver/i2c_master.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 
 namespace seds {
     Expected<std::monostate> TCA6507::set_segments(const uint8_t segments) {
@@ -14,5 +15,9 @@ namespace seds {
 
         this->current_segments = segments;
         return std::monostate{};
+    }
+
+    Expected<std::monostate> TCA6507::set_msg(const std::string msg) {
+        auto args = { .callback = , .arg = , .name = "7-segment timer",  }
     }
 } 

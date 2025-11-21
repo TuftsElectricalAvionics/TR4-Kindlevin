@@ -58,7 +58,7 @@ namespace seds {
         static constexpr int16_t default_address = 0x85;
 
         // I don't think there's any way to fail initilization
-        explicit TCA6507(I2CDevice&& device) : device(std::move(device)) {}
+        explicit TCA6507(I2CDevice&& device) : device(std::move(device)), msg(std::vector()) {}
 
         TCA6507(TCA6507&&) = default;
         TCA6507& operator=(TCA6507&&) = default;
@@ -73,10 +73,16 @@ namespace seds {
         [[nodiscard]]
         Expected<std::monostate> set_segments(const uint8_t segments);    
 
+        [[nodiscard]]
+        Expected<std::monostate> set_msg(const std::string msg);
+
         // TODO: add more high-level display methods
         // We can't do this until we've decided on what pins are mapped to which segments
     private:
         I2CDevice device;
         uint8_t current_segments = 0;
+        std::vector<uint8_t> msg; // using vector, but this isn't hot code so it shouldn't matter
+        uint32_t msg_offset; 
+
     }
 }
