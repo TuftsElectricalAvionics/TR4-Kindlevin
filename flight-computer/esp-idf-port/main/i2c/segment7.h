@@ -73,16 +73,43 @@ namespace seds {
         [[nodiscard]]
         Expected<std::monostate> set_segments(const uint8_t segments);    
 
-        [[nodiscard]]
-        Expected<std::monostate> set_msg(const std::string msg);
-
-        // TODO: add more high-level display methods
-        // We can't do this until we've decided on what pins are mapped to which segments
     private:
         I2CDevice device;
         uint8_t current_segments = 0;
+    }
+
+    class SegmentDisplay {
+    public:
+        explicit SegmentDisplay(I2CDevice&& ldev, I2CDevice&& rdev)
+            : left_display(TCA6507(std::move(ldev))), right_display(TCA6507(std::move(rdev))) {}
+
+        SegmentDisplay(SegmentDisplay&&) = default;
+        SegmentDisplay& operator=(SegmentDisplay&&) = default;
+        SegmentDisplay(SegmentDisplay const&) = delete;
+        SegmentDisplay& operator=(SegmentDisplay const&) = delete;
+        
+        [[nodiscard]]
+        Expected<std::monostate> set_msg(const std::string msg);
+
+        [[nodiscard]]
+        Expected<std::monostate> clear_msg(); 
+
+        void set_scroll_interval(uint64_t interval_us) {
+            this->scroll_interval_us = interval_us; 
+        }
+
+    private:
+        [[nodiscard]]
+        // although this function is called scroll, we actually step the message by two characters 
+        // I don't think 'proper' scrolling would look good on a display this short
+        Expected<std::monostate> scroll_msg();
+
+        TCA6507 left_display;
+        TCA6507 right_display;
+
         std::vector<uint8_t> msg; // using vector, but this isn't hot code so it shouldn't matter
         uint32_t msg_offset; 
-
+        esp_timer_handle_t scroll_timer;
+        uint64_t scroll_interval_us = 500000; // default to 0.5s
     }
 }
