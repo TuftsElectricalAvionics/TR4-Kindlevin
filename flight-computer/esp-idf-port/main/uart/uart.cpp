@@ -5,6 +5,10 @@ namespace seds {
         used_ports = std::set<uart_port_t>();
     }
 
+    UART::~UART() {
+        ESP_ERROR_CHECK(i2c_del_master_bus(this->handle()));
+    }
+
     Expected<UARTDevice> UART::get_device(uart_port_t port, uint32_t baudrate, int tx, int rx, int rts, int cts, TickType_t delay, uint32_t buf_size) {
         auto [_, did_insert] = this->used_ports.insert(port);
 
@@ -34,12 +38,26 @@ namespace seds {
         return UARTDevice(this->shared_from_this(), port, delay);
     }
 
-    Expected<std::monostate> UARTDevice::(const void* data, size_t length) {
+    UARTDevice::UARTDevice(std::shared_ptr<UART> bus, uart_port_t port, TickType_t t_delay) {
+        this->bus = bus;
+        this->port = port;
+        this->delay = t_delay;
+    }
+
+    UARTDevice::~UARTDevice() {
+        if (this->bus) {
+            ESP_ERROR_CHECK(uart_driver_delete(this->port));
+            this->bus->used_ports.erase(this->port);
+        }
+    }
+
+    Expected<std::monostate> UARTDevice::write(const void* data, size_t length) {
         ESP_TRY(uart_write_bytes(this->port, data, length));
         return std::monostate {};
     }
 
-    Expected<size_t> UARTDevice(uint8_t* buffer, size_t length, TickType_t ticks_to_wait, bool fail_on_underread) {
+
+    Expected<size_t> UARTDevice::read(uint8_t* buffer, size_t length, TickType_t ticks_to_wait, bool fail_on_underread) {
         int len = uart_read_bytes(this->port, buffer, length, ticks_to_wait / portTICK_PERIOD_MS);
         if (len == -1) {
             return std::unexpected(
@@ -54,4 +72,6 @@ namespace seds {
 
         return (size_t)len;
     }
+
+
 }

@@ -86,8 +86,9 @@ namespace seds {
 
     private:
         friend class UART;
-        I2Cdevice(std::shared_ptr<I2C> bus, uart_port_t port, TickType_t t_delay);
+        UARTDevice(std::shared_ptr<UART> bus, uart_port_t port, TickType_t t_delay);
 
+        std::shared_ptr<UART> bus;
         TickType_t delay;
         uart_port_t port;
     }
