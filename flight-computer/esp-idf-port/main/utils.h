@@ -1,6 +1,7 @@
 #pragma once
+#include <algorithm>
 #include <array>
-#include <algorithm> 
+#include <ranges>
 #include <type_traits>
 #include <cstdint>
 
