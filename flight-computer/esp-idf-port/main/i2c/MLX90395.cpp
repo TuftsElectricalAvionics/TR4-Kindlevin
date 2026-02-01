@@ -8,7 +8,7 @@ const float gain_sel_table[16] = {
     0.5, 0.6, 0.75, 1.0,
     0.1, 0.125, 0.1667, 0.2,
     0.25, 0.3, 0.375, 0.5
-}
+};
 
 namespace seds {
     enum class MLX90395Register : uint8_t {
@@ -24,7 +24,7 @@ namespace seds {
             case 8:   sensor.lsb = 7.14; break;
             case 9:   sensor.lsb = 2.5; break;
             default:
-                return make_unique<errors::EspError>(ESP_ERR_INVALID_STATE);
+                return std::unexpected(std::make_unique<EspError>(ESP_ERR_INVALID_STATE));
         }
 
         sensor.gain_sel = gain_sel;
@@ -36,7 +36,7 @@ namespace seds {
 
     Expected<std::monostate> MLX90395::set_gain(uint16_t gain_sel) {
         if (gain_sel > 15) {
-            return make_unique<errors::EspError>(ESP_ERR_INVALID_ARG);
+            return std::unexpected(std::make_unique<EspError>(ESP_ERR_INVALID_ARG));
         }
 
         uint16_t reg_value = TRY(this->device.read_be_register<uint16_t>(MLX90395Register::GAIN_SEL)) 

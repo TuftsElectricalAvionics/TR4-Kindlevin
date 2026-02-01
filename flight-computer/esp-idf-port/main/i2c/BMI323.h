@@ -31,7 +31,7 @@ namespace seds {
             _1600 = 0xC,
             _3200 = 0xD,
             _6400 = 0xE,
-        }
+        };
 
         enum class AccelRange : uint16_t {
             _2G = 0x0,
@@ -85,5 +85,5 @@ namespace seds {
         AccelRange accel_range; 
         GyroRange gyro_range;    
         SensorHz sensor_hz;
-    }
+    };
 }
