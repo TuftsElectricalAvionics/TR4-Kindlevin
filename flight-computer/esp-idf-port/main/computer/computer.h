@@ -19,17 +19,14 @@ namespace seds {
 
     class FlightComputer {
     public:
-        FlightComputer(BMP581 baro, SegmentDisplay display, BMI323 imu, 
-            HighGAccel high_g_accel, MLX90395 mag, TMP1075 temp);
-             
-        void process(void);
+        std::shared_ptr<BMP581> baro1;
+        //BMP581 baro2;
+        // fix : SegmentDisplay display;
+        //BMI323 imu;
+        //HighGAccel high_g_accel;
+        //MLX90395 mag;
+        //TMP1075 temp;
 
-    private: 
-        BMP581 baro;
-        SegmentDisplay display;
-        BMI323 imu;
-        HighGAccel high_g_accel;
-        MLX90395 mag;
-        TMP1075 temp;
+        void process(void);
     };
 }
