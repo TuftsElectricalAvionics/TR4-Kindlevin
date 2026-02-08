@@ -59,7 +59,8 @@ namespace seds {
         static constexpr int16_t default_address = 0x85;
 
         // I don't think there's any way to fail initilization
-        explicit TCA6507(I2CDevice&& device) : device(std::move(device)) {}
+        explicit TCA6507(I2CDevice&& device) :
+            device(std::move(device)) {}
 
         TCA6507(TCA6507&&) = default;
         TCA6507& operator=(TCA6507&&) = default;
@@ -72,7 +73,7 @@ namespace seds {
         /// bit 1 controlling segment B, and so on up to bit 6 controlling segment G. 
         /// There isn't any way to control the decimal point segments with the driver we're using.
         [[nodiscard]]
-        Expected<std::monostate> set_segments(const uint8_t segments);    
+        Expected<std::monostate> set_segments(const uint8_t segments);
 
     private:
         I2CDevice device;
@@ -81,22 +82,23 @@ namespace seds {
 
     class SegmentDisplay {
     public:
-        explicit SegmentDisplay(I2CDevice&& ldev, I2CDevice&& rdev)
-            : left_display(TCA6507(std::move(ldev))), right_display(TCA6507(std::move(rdev))) {}
+        explicit SegmentDisplay(I2CDevice&& ldev, I2CDevice&& rdev) :
+            left_display(TCA6507(std::move(ldev))), right_display(TCA6507(std::move(rdev))) {}
 
         SegmentDisplay(SegmentDisplay&&) = default;
         SegmentDisplay& operator=(SegmentDisplay&&) = default;
         SegmentDisplay(SegmentDisplay const&) = delete;
         SegmentDisplay& operator=(SegmentDisplay const&) = delete;
-        
+
         [[nodiscard]]
         Expected<std::monostate> set_msg(const std::string msg);
 
         [[nodiscard]]
-        Expected<std::monostate> clear_msg(); 
+        Expected<std::monostate> clear_msg();
 
         void set_scroll_interval(uint64_t interval_us) {
-            this->scroll_interval_us = interval_us; 
+            this->scroll_interval_us = interval_us;
+            this->start_timer(true);
         }
 
     private:
@@ -105,11 +107,13 @@ namespace seds {
         // I don't think 'proper' scrolling would look good on a display this short
         Expected<std::monostate> scroll_msg();
 
+        Expected<std::monostate> start_timer(bool restart);
+
         TCA6507 left_display;
         TCA6507 right_display;
 
         std::vector<uint8_t> msg; // using vector, but this isn't hot code so it shouldn't matter
-        uint32_t msg_offset; 
+        uint32_t msg_offset;
         esp_timer_handle_t scroll_timer;
         uint64_t scroll_interval_us = 500000; // default to 0.5s
     };
