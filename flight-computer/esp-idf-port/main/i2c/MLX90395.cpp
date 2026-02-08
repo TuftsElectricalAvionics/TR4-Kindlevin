@@ -8,12 +8,14 @@ const float gain_sel_table[16] = {
     0.5, 0.6, 0.75, 1.0,
     0.1, 0.125, 0.1667, 0.2,
     0.25, 0.3, 0.375, 0.5
-}
+};
 
 namespace seds {
     enum class MLX90395Register : uint8_t {
         GAIN_SEL = 0x00,
-        DATA = 0x80,
+        X_DATA = 0x82,
+        Y_DATA = 0x84,
+        Z_DATA = 0x86
     };
 
     Expected<MLX90395> MLX90395::create(I2CDevice&& device) {
@@ -24,7 +26,7 @@ namespace seds {
             case 8:   sensor.lsb = 7.14; break;
             case 9:   sensor.lsb = 2.5; break;
             default:
-                return make_unique<errors::EspError>(ESP_ERR_INVALID_STATE);
+                return std::unexpected(std::make_unique<EspError>(ESP_ERR_INVALID_STATE));
         }
 
         sensor.gain_sel = gain_sel;
@@ -36,7 +38,7 @@ namespace seds {
 
     Expected<std::monostate> MLX90395::set_gain(uint16_t gain_sel) {
         if (gain_sel > 15) {
-            return make_unique<errors::EspError>(ESP_ERR_INVALID_ARG);
+            return std::unexpected(std::make_unique<EspError>(ESP_ERR_INVALID_ARG));
         }
 
         uint16_t reg_value = TRY(this->device.read_be_register<uint16_t>(MLX90395Register::GAIN_SEL)) 
@@ -50,13 +52,15 @@ namespace seds {
     }
 
     Expected<MLX90395Data> MLX90395::read_magnetic_field() {
-        // first two bytes are unused config
-        auto raw_data = TRY(this->device.read_be_register<std::array<int16_t, 4>>(MLX90395Register::DATA));
+        
+        uint16_t x_data = TRY(this->device.read_be_register<u_int16_t>(MLX90395Register::X_DATA));
+        uint16_t y_data = TRY(this->device.read_be_register<u_int16_t>(MLX90395Register::Y_DATA));
+        uint16_t z_data = TRY(this->device.read_be_register<u_int16_t>(MLX90395Register::Z_DATA));
 
         MLX90395Data data;
-        data.mx = static_cast<float>(raw_data[1]) * this->lsb * gain_sel_table[this->gain_sel];
-        data.my = static_cast<float>(raw_data[2]) * this->lsb * gain_sel_table[this->gain_sel];
-        data.mz = static_cast<float>(raw_data[3]) * this->lsb * gain_sel_table[this->gain_sel];
+        data.mx = static_cast<float>(x_data) * this->lsb * gain_sel_table[this->gain_sel];
+        data.my = static_cast<float>(y_data) * this->lsb * gain_sel_table[this->gain_sel];
+        data.mz = static_cast<float>(z_data) * this->lsb * gain_sel_table[this->gain_sel];
 
         return data;
     }

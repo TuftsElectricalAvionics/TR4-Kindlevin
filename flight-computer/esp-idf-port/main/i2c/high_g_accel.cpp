@@ -18,7 +18,7 @@ namespace seds {
 
     HighGAccel::HighGAccel(I2CDevice&& device) : device(std::move(device)) {}
 
-    static Expected<HighGAccel> HighGAccel::create(I2CDevice&& device)  {
+    Expected<HighGAccel> HighGAccel::create(I2CDevice&& device)  {
         auto accel = HighGAccel(std::move(device));
 
         /// Initialize the accelerometer: Full resolution, ±200g

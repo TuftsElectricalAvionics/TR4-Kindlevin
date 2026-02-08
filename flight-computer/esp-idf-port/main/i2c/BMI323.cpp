@@ -12,6 +12,8 @@
 namespace seds {
     enum class BMI323Register : uint8_t {
         CHIP_ID = 0x00,
+        ERR_REG = 0x01,
+        STATUS = 0x02,
         ACC_DATA_X = 0X03,
         ACC_DATA_Y = 0X04,
         ACC_DATA_Z = 0X05,
@@ -26,8 +28,8 @@ namespace seds {
     // However, the actual values are probably powers of two, so we could guess what they are and get slightly better precision
     // For now, I'll use what I've found in the data sheet 
 
-    const float accel_sens[4] = {16380.0, 8190.0, 4010.0, 2050.0}; // LSB/g for ranges 2g, 4g, 8g, 16g
-    const float gyro_sens[5] = {262.144, 131.072, 65.536, 32.768, 16.4}; // LSB/°/s for ranges 125, 250, 500, 1000, 2000 dps
+    const std::array<float, 4> accel_divisors {16380.0, 8190.0, 4010.0, 2050.0}; // LSB/g for ranges 2g, 4g, 8g, 16g
+    const std::array<float, 5> gyro_divisors {262.144, 131.072, 65.536, 32.768, 16.4}; // LSB/°/s for ranges 125, 250, 500, 1000, 2000 dps
 
     BMI323::BMI323(I2CDevice&& device) : device(std::move(device)) {}
 
@@ -79,14 +81,14 @@ namespace seds {
     bool BMI323::is_connected() {
         constexpr uint16_t device_id = 0x0043; // BMI323 ID
 
-        auto result = (uint16_t)(imu.device.read_le_register<uint32_t>(BMI323Register::ACCEL_X_LSB));
-        return result.has_value() && result.value() == device_id;
-    }   
+        auto result = this->device.read_le_register<uint32_t>(BMI323Register::ACC_DATA_X);
+        return result.has_value() && (uint16_t)result.value() == device_id;
+    }
 
     Expected<std::monostate> BMI323::set_accel_range(AccelRange range) {
         TRY(this->write_accel_config(range, this->sensor_hz));
 
-        this->accel_range = range; 
+        this->accel_range = range;
 
         return std::monostate {};
     }
@@ -109,23 +111,30 @@ namespace seds {
     }
 
     Expected<IMUData> BMI323::read_imu() {
+        // The device sends 32-bit LE numbers, but the upper 16 bits are always zeroed out
+        // according to page 208 of the datasheet.
+
         // Read accelerometer data
-        auto ax_raw = TRY((uint16_t)(this->device.read_le_register<uint32_t>(BMI323Register::ACC_DATA_X)));
-        auto ay_raw = TRY((uint16_t)(this->device.read_le_register<uint32_t>(BMI323Register::ACC_DATA_Y)));
-        auto az_raw = TRY((uint16_t)(this->device.read_le_register<uint32_t>(BMI323Register::ACC_DATA_Z)));
+        uint16_t ax_raw = TRY((this->device.read_le_register<uint32_t>(BMI323Register::ACC_DATA_X)));
+        uint16_t ay_raw = TRY((this->device.read_le_register<uint32_t>(BMI323Register::ACC_DATA_Y)));
+        uint16_t az_raw = TRY((this->device.read_le_register<uint32_t>(BMI323Register::ACC_DATA_Z)));
 
         // Read gyroscope data
-        auto gx_raw = TRY((uint16_t)(this->device.read_le_register<uint32_t>(BMI323Register::GYR_DATA_X)));
-        auto gy_raw = TRY((uint16_t)(this->device.read_le_register<uint32_t>(BMI323Register::GYR_DATA_Y)));
-        auto gz_raw = TRY((uint16_t)(this->device.read_le_register<uint32_t>(BMI323Register::GYR_DATA_Z)));
+        uint16_t gx_raw = TRY((this->device.read_le_register<uint32_t>(BMI323Register::GYR_DATA_X)));
+        uint16_t gy_raw = TRY((this->device.read_le_register<uint32_t>(BMI323Register::GYR_DATA_Y)));
+        uint16_t gz_raw = TRY((this->device.read_le_register<uint32_t>(BMI323Register::GYR_DATA_Z)));
 
-        IMUData data;
-        data.ax = static_cast<float>(ax_raw) / accel_sens[this->accel_range];
-        data.ay = static_cast<float>(ay_raw) / accel_sens[this->accel_range];
-        data.az = static_cast<float>(az_raw) / accel_sens[this->accel_range];
-        data.gx = static_cast<float>(gx_raw) / gyro_sens[this->gyro_range];
-        data.gy = static_cast<float>(gy_raw) / gyro_sens[this->gyro_range];
-        data.gz = static_cast<float>(gz_raw) / gyro_sens[this->gyro_range];
+        auto accel_range = static_cast<size_t>(this->accel_range);
+        auto gyro_range = static_cast<size_t>(this->gyro_range);
+
+        IMUData data = {
+            .ax = static_cast<float>(ax_raw) / accel_divisors[accel_range],
+            .ay = static_cast<float>(ay_raw) / accel_divisors[accel_range],
+            .az = static_cast<float>(az_raw) / accel_divisors[accel_range],
+            .gx = static_cast<float>(gx_raw) / gyro_divisors[gyro_range],
+            .gy = static_cast<float>(gy_raw) / gyro_divisors[gyro_range],
+            .gz = static_cast<float>(gz_raw) / gyro_divisors[gyro_range],
+        };
 
         return data;
     }

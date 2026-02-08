@@ -23,7 +23,9 @@ namespace seds {
     Expected<BMP581> BMP581::create(I2CDevice&& device) {
         BMP581 bmp581(std::move(device));
         if (!bmp581.is_connected()) {
-            return std::make_unique<std::runtime_error>("BMP581 not connected or not responding");
+            return std::unexpected(
+                std::make_unique<std::runtime_error>("BMP581 not connected or not responding")
+            );
         }
 
         // enter normal mode
@@ -46,11 +48,15 @@ namespace seds {
         auto const int_status = this->device.read_be_register<uint8_t>(BMP581Register::INT_STATUS);
         auto const status = this->device.read_be_register<uint8_t>(BMP581Register::STATUS);
 
+        if (!id.has_value() || !int_status.has_value() || !status.has_value()) {
+            return false;
+        }
+
         // according to the datasheet, valid ID is non-zero
         // valid int_status eqwuals 0x10
-        // valid status has bits 1 and 2 set 
-        return id.has_value() && int_status.has_value() && status.has_value() 
-            && id.value() != 0 && int_status.value() == 0x10 && status.value() & 0x06 == 0x06; 
+        // valid status has bits 1 and 2 set
+        constexpr uint8_t expected_id = 0b0101'0000;
+        return id.value() == expected_id && int_status.value() == 0x10 && (status.value() & 0x06) == 0x06;
     }
 
     Expected<BarometerData> BMP581::read_data() {

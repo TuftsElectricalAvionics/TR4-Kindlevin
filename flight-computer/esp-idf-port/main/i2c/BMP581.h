@@ -36,5 +36,5 @@ namespace seds {
         explicit BMP581(I2CDevice&& device);
 
         I2CDevice device;
-    }
+    };
 }

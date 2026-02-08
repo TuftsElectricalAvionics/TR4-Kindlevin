@@ -37,5 +37,5 @@ namespace seds {
         I2CDevice device;
         uint16_t gain_sel;
         float lsb;
-    }
+    };
 }
