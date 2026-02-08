@@ -8,13 +8,13 @@
 #include "driver/i2c_master.h"
 #include "i2c/TMP1075.h"
 #include "errors.h"
+#include "logger.h"
 
-static const char *TAG = "example";
+static const char* TAG = "example";
 
 using namespace seds::errors;
 
-extern "C" void app_main()
-{
+extern "C" void app_main() {
     ESP_LOGI(TAG, "Hello!");
 
     auto i2c = seds::I2C::create();
@@ -27,4 +27,14 @@ extern "C" void app_main()
     float const temp = unwrap(temp_sensor.read_temperature());
 
     ESP_LOGI(TAG, "Temperature: %f", temp);
+
+    xTaskCreateStatic(
+        seds::logger_task_impl,
+        "Logger",
+        seds::LOGGER_TASK_STACK_SIZE,
+        nullptr,
+        seds::LOGGER_TASK_PRIORITY,
+        seds::LOGGER_TASK_STACK,
+        &seds::LOGGER_TASK
+    );
 }

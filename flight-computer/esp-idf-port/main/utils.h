@@ -54,3 +54,17 @@ namespace seds::num {
         return std::bit_cast<T>(buffer);
     }
 }
+
+namespace seds {
+    /// Sleeps the current task for the specified duration.
+    ///
+    /// This is a wrapper for vTaskDelay that takes a duration instead of a tick count.
+    template<typename Rep, typename Period>
+    void delay(std::chrono::duration<Rep, Period> duration) {
+        using std::chrono::milliseconds;
+
+        auto ms_duration = std::chrono::duration_cast<milliseconds>(duration);
+        TickType_t const ticks = ms_duration.count() / portTICK_PERIOD_MS;
+        vTaskDelay(ticks);
+    }
+}

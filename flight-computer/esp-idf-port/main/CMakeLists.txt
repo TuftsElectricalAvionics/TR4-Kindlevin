@@ -1,5 +1,6 @@
 idf_component_register(SRCS "main.cpp"
         "sd.cpp"
+        "logger.cpp"
         "i2c/I2C.cpp"
         "i2c/TMP1075.cpp"
         "i2c/high_g_accel.cpp"
