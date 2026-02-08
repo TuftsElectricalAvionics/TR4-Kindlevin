@@ -1,4 +1,4 @@
-idf_component_register(SRCS "main.cpp"
+idf_component_register(SRCS "sd.cpp" "main.cpp"
         "i2c/I2C.cpp"
         "i2c/TMP1075.cpp"
         "i2c/high_g_accel.cpp"
@@ -6,5 +6,6 @@ idf_component_register(SRCS "main.cpp"
         "i2c/BMP581.cpp"
         "i2c/BMI323.cpp"
         "i2c/MLX90395.cpp"
-        PRIV_REQUIRES spi_flash esp_driver_i2c esp_timer
+        "sd.cpp"
+        PRIV_REQUIRES spi_flash esp_driver_i2c fatfs esp_timer
         INCLUDE_DIRS ".")

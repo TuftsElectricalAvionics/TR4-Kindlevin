@@ -7,6 +7,7 @@
 #include "driver/i2c_master.h"
 #include "i2c/TMP1075.h"
 #include "errors.h"
+#include "sd.h"
 
 static const char *TAG = "example";
 
