@@ -26,13 +26,18 @@ extern "C" void app_main()
     auto i2c = seds::I2C::create();
     ESP_LOGI(TAG, "I2C initialized successfully");
 
-    auto baro_sensor = unwrap(i2c->get_device<seds::BMP581>());
-    auto display = unwrap(i2c->get_device<seds::SegmentDisplay>());
-    auto imu = unwrap(i2c->get_device<seds::BMI323>()); // should be allowed to fail
-    auto high_g = unwrap(i2c->get_device<seds::HighGAccel>());
-    auto mag_sensor = unwrap(i2c->get_device<seds::MLX90395>());
+    // should we have a template function for calling `create`?
+
+    auto baro_sensor_1 = unwrap(seds::BMP581::create( unwrap(i2c->get_device(seds::BMP581::address_1)) ));
+    auto baro_sensor_2 = unwrap(seds::BMP581::create( unwrap(i2c->get_device(seds::BMP581::address_2)) ));
+
+    auto disp = seds::TCA6507( unwrap(i2c->get_device(0x45))); //  fix this!  // should be allowed to fail
+    auto imu = unwrap(seds::BMI323::create( unwrap(i2c->get_device(seds::BMI323::default_address)) ));
+    auto high_g = unwrap(seds::HighGAccel::create( unwrap(i2c->get_device(seds::HighGAccel::default_address)) ));
+    auto mag_sensor = unwrap(seds::MLX90395::create( unwrap(i2c->get_device(seds::MLX90395::default_address)) ));
     auto temp_sensor = unwrap(i2c->get_device<seds::TMP1075>());
 
+    /*
     auto computer = seds::FlightComputer {
         .baro = baro,
         .display = display,
@@ -43,4 +48,5 @@ extern "C" void app_main()
     };
 
     computer::process();
+    */
 }
