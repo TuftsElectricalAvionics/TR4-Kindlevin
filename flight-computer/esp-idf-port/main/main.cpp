@@ -4,6 +4,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "i2c/I2C.h"
+#include "sd.h"
 #include "driver/i2c_master.h"
 #include "i2c/TMP1075.h"
 #include "errors.h"

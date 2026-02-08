@@ -2,7 +2,9 @@
 
 #include <expected>
 #include <print>
+#include <memory>
 #include <iostream>
+#include "esp_err.h"
 #include "esp_log.h"
 
 // This file defines helpers for exceptionless error handling.
@@ -38,7 +40,7 @@ namespace seds::errors {
     /// An error sourced from ESP-IDF.
     class EspError final : public std::runtime_error {
     public:
-        explicit EspError(esp_err_t const error) : runtime_error(esp_err_to_name(error)) {}
+        explicit EspError(const esp_err_t error) : runtime_error(esp_err_to_name(error)) {}
     };
 
     /// Checks if the given value is an error, and if it is, terminates.
