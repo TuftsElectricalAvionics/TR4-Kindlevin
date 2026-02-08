@@ -1,5 +1,6 @@
 #pragma once
 
+#include "esp_timer.h"
 #include "I2C.h"
 
 const uint8_t ALPHA_TABLE[26] = {
@@ -58,7 +59,7 @@ namespace seds {
         static constexpr int16_t default_address = 0x85;
 
         // I don't think there's any way to fail initilization
-        explicit TCA6507(I2CDevice&& device) : device(std::move(device)), msg(std::vector()) {}
+        explicit TCA6507(I2CDevice&& device) : device(std::move(device)) {}
 
         TCA6507(TCA6507&&) = default;
         TCA6507& operator=(TCA6507&&) = default;
@@ -76,7 +77,7 @@ namespace seds {
     private:
         I2CDevice device;
         uint8_t current_segments = 0;
-    }
+    };
 
     class SegmentDisplay {
     public:
@@ -111,5 +112,5 @@ namespace seds {
         uint32_t msg_offset; 
         esp_timer_handle_t scroll_timer;
         uint64_t scroll_interval_us = 500000; // default to 0.5s
-    }
+    };
 }

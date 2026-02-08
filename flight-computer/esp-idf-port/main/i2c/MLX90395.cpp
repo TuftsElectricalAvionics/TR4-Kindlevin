@@ -13,7 +13,9 @@ const float gain_sel_table[16] = {
 namespace seds {
     enum class MLX90395Register : uint8_t {
         GAIN_SEL = 0x00,
-        DATA = 0x80,
+        X_DATA = 0x82,
+        Y_DATA = 0x84,
+        Z_DATA = 0x86
     };
 
     Expected<MLX90395> MLX90395::create(I2CDevice&& device) {
@@ -50,13 +52,15 @@ namespace seds {
     }
 
     Expected<MLX90395Data> MLX90395::read_magnetic_field() {
-        // first two bytes are unused config
-        auto raw_data = TRY(this->device.read_be_register<std::array<int16_t, 4>>(MLX90395Register::DATA));
+        
+        uint16_t x_data = TRY(this->device.read_be_register<u_int16_t>(MLX90395Register::X_DATA));
+        uint16_t y_data = TRY(this->device.read_be_register<u_int16_t>(MLX90395Register::Y_DATA));
+        uint16_t z_data = TRY(this->device.read_be_register<u_int16_t>(MLX90395Register::Z_DATA));
 
         MLX90395Data data;
-        data.mx = static_cast<float>(raw_data[1]) * this->lsb * gain_sel_table[this->gain_sel];
-        data.my = static_cast<float>(raw_data[2]) * this->lsb * gain_sel_table[this->gain_sel];
-        data.mz = static_cast<float>(raw_data[3]) * this->lsb * gain_sel_table[this->gain_sel];
+        data.mx = static_cast<float>(x_data) * this->lsb * gain_sel_table[this->gain_sel];
+        data.my = static_cast<float>(y_data) * this->lsb * gain_sel_table[this->gain_sel];
+        data.mz = static_cast<float>(z_data) * this->lsb * gain_sel_table[this->gain_sel];
 
         return data;
     }
