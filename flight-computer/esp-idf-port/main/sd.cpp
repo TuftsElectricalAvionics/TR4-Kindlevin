@@ -7,7 +7,9 @@ Expected<SDCard> SDCard::create() {
     esp_vfs_fat_sdmmc_mount_config_t mount_cfg = {
         .format_if_mount_failed = false,
         .max_files = MAX_FILES,
-        .allocation_unit_size = 16 * 1024 // taken from example
+        .allocation_unit_size = 16 * 1024, // taken from example
+        .disk_status_check_enable = false,
+        .use_one_fat = false,
     };
 
     sdmmc_card_t *card;
