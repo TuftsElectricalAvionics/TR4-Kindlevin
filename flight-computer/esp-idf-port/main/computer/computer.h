@@ -12,6 +12,7 @@
 #include "i2c/MLX90395.h"
 #include "i2c/segment7.h"
 #include "i2c/TMP1075.h"
+#include "sd.h"
 #include "utils.h"
 
 namespace seds {
@@ -19,14 +20,19 @@ namespace seds {
 
     class FlightComputer {
     public:
-        std::shared_ptr<BMP581> baro1;
-        //BMP581 baro2;
+        BMP581 baro1;
+        BMP581 baro2;
         // fix : SegmentDisplay display;
-        //BMI323 imu;
-        //HighGAccel high_g_accel;
-        //MLX90395 mag;
-        //TMP1075 temp;
+        BMI323 imu;
+        HighGAccel high_g_accel;
+        MLX90395 mag;
+        TMP1075 temp;
+        SDCard sd;
 
+        Expected<std::monostate> init(void);
         void process(void);
+
+    private:
+        static constexpr char filename[] = "data.csv";  
     };
 }
