@@ -234,6 +234,71 @@ Expected<std::monostate> SDCard::read_file(const char *path, uint8_t* buffer, si
     return {};
 }
 
+Expected<std::monostate> SDCard::flush_file(const char *path) {
+    errno = 0;
+    FILE *f = fopen(path, "a");
+    if (f == NULL) {
+        // save error
+        auto error = errno;
+        if (error == ENOMEM) {
+            return std::unexpected(std::make_unique<std::exception>(std::runtime_error("failed to allocate memory for file")));
+        }
+        if (error == EDQUOT) {
+            return std::unexpected(std::make_unique<std::exception>(std::runtime_error("no space on card for file")));
+        }
+        if (error == EINVAL) {
+            return std::unexpected(std::make_unique<std::exception>(std::runtime_error("file basename was invalid")));
+        }
+        if (error == EISDIR) {
+            return std::unexpected(std::make_unique<std::exception>(std::runtime_error("file points to directory")));
+        }
+        if (error == ENAMETOOLONG) {
+            return std::unexpected(std::make_unique<std::exception>(std::runtime_error("path was too long")));
+        }
+        if (error == ENOENT) {
+            return std::unexpected(std::make_unique<std::exception>(std::runtime_error("a directory in the path did not exist")));
+        }
+        else {
+            return std::unexpected(std::make_unique<std::exception>(std::runtime_error(strerror(error))));
+        }
+    }
+
+    fflush(f);
+    if (errno != 0) {
+        // save error
+        auto error = errno;
+        clearerr(f);
+        // attempt to close file
+        fclose(f);
+        if (error == EDQUOT || error == ENOSPC) {
+            return std::unexpected(std::make_unique<std::exception>(std::runtime_error("no space on card for file")));
+        }
+        if (error == EIO) {
+            return std::unexpected(std::make_unique<std::exception>(std::runtime_error("an io error occured")));
+        }
+        else {
+            return std::unexpected(std::make_unique<std::exception>(std::runtime_error(strerror(error))));
+        }
+    }
+
+    if (fclose(f) != 0) {
+        // save error
+        auto error = errno;
+        clearerr(f);
+        if (error == EDQUOT || error == ENOSPC) {
+            return std::unexpected(std::make_unique<std::exception>(std::runtime_error("no space on card for file")));
+        }
+        if (error == EIO) {
+            return std::unexpected(std::make_unique<std::exception>(std::runtime_error("an io error occured")));
+        }
+        else {
+            return std::unexpected(std::make_unique<std::exception>(std::runtime_error(strerror(error))));
+        }
+    }
+
+    return {};
+}
+
 Expected<std::monostate> SDCard::rename_file(const char* old_name, const char* new_name) {
     // Check if destination file exists before renaming
     struct stat st;

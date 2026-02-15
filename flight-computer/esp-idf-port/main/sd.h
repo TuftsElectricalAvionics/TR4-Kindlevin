@@ -54,6 +54,8 @@ namespace seds {
 
         Expected<std::monostate> append_file(const char *path, const uint8_t* data, size_t length);
 
+        Expected<std::monostate> flush_file(const char *path);
+
         /// If the old file doesn't exist, or the new file does, this function errors
         Expected<std::monostate> rename_file(const char* old_name, const char* new_name);
 
