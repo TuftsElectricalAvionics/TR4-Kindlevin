@@ -31,7 +31,7 @@ namespace seds {
         return reg.value() == device_id;
     }
 
-    Expected<float> TMP1075::read_temperature() {
+    Expected<float> TMP1075::get() {
         // https://www.ti.com/lit/an/sbaa588a/sbaa588a.pdf?ts=1760629136511
 
         // Bits 15-4 contain signed big-endian temperature, 3-0 are unused

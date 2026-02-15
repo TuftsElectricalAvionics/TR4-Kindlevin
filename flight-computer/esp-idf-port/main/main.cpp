@@ -8,7 +8,8 @@
 #include "driver/i2c_master.h"
 #include "i2c/TMP1075.h"
 #include "errors.h"
-#include "logger.h"
+#include "task/i2c.h"
+#include <esp_pthread.h>
 
 static const char* TAG = "example";
 
@@ -17,24 +18,12 @@ using namespace seds::errors;
 extern "C" void app_main() {
     ESP_LOGI(TAG, "Hello!");
 
-    auto i2c = seds::I2C::create();
-    ESP_LOGI(TAG, "I2C initialized successfully");
+    esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
+    esp_pthread_set_cfg(&cfg);
 
-    auto temp_sensor = unwrap(i2c->get_device<seds::TMP1075>());
+    seds::I2CManager::start();
 
-    std::cout << "Temp sensor connected: " << temp_sensor.is_connected();
-
-    float const temp = unwrap(temp_sensor.read_temperature());
-
-    ESP_LOGI(TAG, "Temperature: %f", temp);
-
-    xTaskCreateStatic(
-        seds::logger_task_impl,
-        "Logger",
-        seds::LOGGER_TASK_STACK_SIZE,
-        nullptr,
-        seds::LOGGER_TASK_PRIORITY,
-        seds::LOGGER_TASK_STACK,
-        &seds::LOGGER_TASK
-    );
+    while (true) {
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
 }

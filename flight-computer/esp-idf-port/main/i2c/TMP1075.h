@@ -45,7 +45,7 @@ namespace seds {
 
         /// Read the last temperature measurement from the sensor in degrees Celsius.
         [[nodiscard]]
-        Expected<float> read_temperature();
+        Expected<float> get();
 
         /// Run a closure which can read the device's current configuration and update it
         /// as desired.
