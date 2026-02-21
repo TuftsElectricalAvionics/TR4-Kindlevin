@@ -2,6 +2,9 @@
 
 #include <algorithm>
 #include <cstdio>
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 namespace seds {
 
@@ -11,8 +14,8 @@ Expected<std::monostate> FlightComputer::init() {
     return this->sd.create_file(FlightComputer::filename, (uint8_t *)data, sizeof(data)-1); // subtract one
 }
 
-void FlightComputer::process() {
-    while (true) {
+void FlightComputer::process(uint32_t times, bool endless) {
+    for (int i = 0; i < times && !endless; i++) {
         // just collect imu for now
         auto imu_data_try = this->imu.read_imu();
         if (!imu_data_try.has_value()) {
@@ -41,8 +44,14 @@ void FlightComputer::process() {
         // if this takes too long we should rework the api to hand out file descriptors
         // no need to flush file since this function calls fclose
         // if we switch to file descriptors we need to explicitly flush
-        sd.append_file(FlightComputer::filename, (uint8_t *)buffer, idx + 1); // add one to include newline but not null terminator
+        ESP_LOGI("computer", "%g, %g, %g", imu_data.ax, imu_data.ay, imu_data.az);
+        ESP_LOGI("computer", "%s", buffer);
+        auto append_res = sd.append_file(FlightComputer::filename, (uint8_t *)buffer, idx + 1); // add one to include newline but not null terminator
+        if (!append_res.has_value()) {
+            ESP_LOGE("computer", "flight computer append error: %s", append_res.error()->what());
+        }
         // TODO ADD TIMESTAMP AND OTHER DATA
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 

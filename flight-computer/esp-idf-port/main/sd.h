@@ -13,6 +13,7 @@
 #include "esp_vfs_fat.h"
 #include "sdmmc_cmd.h"
 
+#define EXAMPLE_MAX_CHAR_SIZE 64
 const uint32_t MAX_FILES = 10; // ?
 const gpio_num_t PIN_NUM_MOSI = (gpio_num_t)13;
 const gpio_num_t PIN_NUM_MISO = (gpio_num_t)12; 
@@ -37,11 +38,8 @@ namespace seds {
     class SDCard {
     public:
         ~SDCard() {
-            esp_vfs_fat_sdcard_unmount(MOUNT_POINT, card);
-            spi_bus_free((spi_host_device_t)host.slot); // TODO CHANGE
-
-            // Deinitialize the power control driver if it was used
-            // TODO
+            //esp_vfs_fat_sdcard_unmount(MOUNT_POINT, card);
+            //spi_bus_free((spi_host_device_t)host.slot); // TODO CHANGE
         }
 
         static Expected<SDCard> create();
@@ -64,8 +62,9 @@ namespace seds {
         Expected<struct stat> stat_file(const char* path);
         
     private:
-        SDCard(sdmmc_card_t *v_card, sdmmc_host_t v_host) :  card(v_card), host(v_host) {}
-        sdmmc_card_t* card = NULL;
-        sdmmc_host_t host;
+        //SDCard(sdmmc_card_t *v_card, sdmmc_host_t v_host) :  card(v_card), host(v_host) {}
+        //sdmmc_card_t* card = NULL;
+        //sdmmc_host_t host;
+        SDCard() {}
     };
 }
