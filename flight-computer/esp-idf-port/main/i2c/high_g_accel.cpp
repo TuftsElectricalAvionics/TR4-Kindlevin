@@ -3,8 +3,6 @@
 #include "driver/i2c_master.h"
 #include "esp_log.h"
 
-#define HIGH_G_ACCEL_SENS 20.5 /// Is this the correct value?
-
 /// TODO: Config?
 namespace seds {
     enum class ADXL375Register : uint8_t {
@@ -16,6 +14,8 @@ namespace seds {
         DATAZ0 = 0x36,
     };
 
+    constexpr float accel_sense = 20.5; 
+
     HighGAccel::HighGAccel(I2CDevice&& device) : device(std::move(device)) {}
 
     Expected<HighGAccel> HighGAccel::create(I2CDevice&& device)  {
@@ -25,7 +25,7 @@ namespace seds {
         TRY(
             accel.device.write_be_register<uint8_t>(
                 ADXL375Register::DATA_FORMAT,
-                0x0F
+                0x08 // right justified
             )
         );
 
@@ -51,16 +51,15 @@ namespace seds {
 
     
     Expected<HighGAccelData> HighGAccel::read_acceleration() {
-        /// These are stored in little-endian format
-        /// FIXME: Make new I2C function
+        // FIXME: read all sensors at once
         auto x = TRY(this->device.read_le_register<int16_t>(ADXL375Register::DATAX0));
         auto y = TRY(this->device.read_le_register<int16_t>(ADXL375Register::DATAY0));
         auto z = TRY(this->device.read_le_register<int16_t>(ADXL375Register::DATAZ0));
 
         HighGAccelData data;
-        data.h_ax = static_cast<float>(x) / HIGH_G_ACCEL_SENS;
-        data.h_ay = static_cast<float>(y) / HIGH_G_ACCEL_SENS;
-        data.h_az = static_cast<float>(z) / HIGH_G_ACCEL_SENS;
+        data.h_ax = static_cast<float>(x) / accel_sense;
+        data.h_ay = static_cast<float>(y) / accel_sense;
+        data.h_az = static_cast<float>(z) / accel_sense;
 
         return data;
     }

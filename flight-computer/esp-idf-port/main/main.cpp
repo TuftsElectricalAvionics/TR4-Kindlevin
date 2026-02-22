@@ -44,7 +44,13 @@ extern "C" void app_main()
         ESP_LOGE(TAG, "imu not connected!");
     }
    
-    //seds::HighGAccel high_g = unwrap(seds::HighGAccel::create( unwrap(i2c->get_device(seds::HighGAccel::default_address)) ));
+    seds::HighGAccel high_g = unwrap(seds::HighGAccel::create( unwrap(i2c->get_device(seds::HighGAccel::default_address)) ));
+    if (high_g.is_connected()) {
+        ESP_LOGI(TAG, "high g accel connected!");
+    } else {
+        ESP_LOGE(TAG, "high g accel not connected!");
+    }
+
     //seds::MLX90395 mag_sensor = unwrap(seds::MLX90395::create( unwrap(i2c->get_device(seds::MLX90395::default_address)) ));
     seds::TMP1075 temp_sensor = unwrap(i2c->get_device<seds::TMP1075>());
     if (temp_sensor.is_connected()) {
@@ -54,17 +60,27 @@ extern "C" void app_main()
     }
 
     
-    auto data_try = baro_sensor_1.read_data();
-    auto data_try_2 = baro_sensor_2.read_data();
-    if (!data_try.has_value() || !data_try_2.has_value()) {
+    auto baro_data_try = baro_sensor_1.read_data();
+    auto baro_data_try_2 = baro_sensor_2.read_data();
+    if (!baro_data_try.has_value() || !baro_data_try_2.has_value()) {
         ESP_LOGE(TAG, "baro data read failed");
     } else {
-        seds::BarometerData data1 = data_try.value();
-        seds::BarometerData data2 = data_try_2.value();
+        seds::BarometerData data1 = baro_data_try.value();
+        seds::BarometerData data2 = baro_data_try_2.value();
         ESP_LOGI(TAG, "baro 1 temp: %f, baro 2 temp: %f, baro 1 pressure: %f, baro 2 pressure: %f", 
             data1.baro_temp, data2.baro_temp, data1.pressure, data2.pressure);
     }
     
+    auto high_g_data_try = high_g.read_acceleration();
+    auto imu_data = imu.read_imu();
+    if (!high_g_data_try.has_value() || !imu_data.has_value()) {
+        ESP_LOGE(TAG, "high g or imu data read failed");
+    } else {
+        seds::HighGAccelData data1 = high_g_data_try.value();
+        seds::IMUData data2 = imu_data.value();
+        ESP_LOGI(TAG, "imu ax: %f, high g ax: %f, imu ay: %f, high g ay: %f, imu az: %f, high g az: %f", 
+            data2.ax, data1.h_ax, data2.ay, data1.h_ay, data2.az, data1.h_az);
+    }
 
     /*
     seds::SDCard sd = unwrap(seds::SDCard::create());
