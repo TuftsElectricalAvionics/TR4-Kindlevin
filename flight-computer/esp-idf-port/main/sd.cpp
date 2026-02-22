@@ -17,15 +17,11 @@ Expected<SDCard> SDCard::create() {
         .format_if_mount_failed = false,//true,
         .max_files = 5,//MAX_FILES,
         .allocation_unit_size = 16 * 1024, // this needs to match whatever we format it with
-        //.disk_status_check_enable = false,
-        //.use_one_fat = false,
+        .disk_status_check_enable = false,
+        .use_one_fat = false,
     };
-
     
     host = SDSPI_HOST_DEFAULT();
-
-    
-    //host.max_freq_khz = 10000;
 
     bus_cfg = {
         .mosi_io_num = PIN_NUM_MOSI,
@@ -45,15 +41,6 @@ Expected<SDCard> SDCard::create() {
     ESP_TRY(esp_vfs_fat_sdspi_mount(mount_point, &host, &slot_config, &mount_cfg, &card));
     ESP_LOGI("SD", "fs mount successful");
     sdmmc_card_print_info(stdout, card);
-
-    //esp_vfs_fat_sdcard_unmount(mount_point, card);
-    //ESP_LOGI("SD", "Card unmounted");
-
-    // deinitialize the bus after all devices are removed
-    //spi_bus_free((spi_host_device_t)host.slot);
-
-    //std::unique_ptr<std::exception> err = std::make_unique<seds::errors::EspError>(ESP_FAIL); 
-    //return std::unexpected(std::move(err)); 
 
     return SDCard();
 }

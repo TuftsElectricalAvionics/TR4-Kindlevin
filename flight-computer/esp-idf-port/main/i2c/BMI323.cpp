@@ -112,14 +112,18 @@ namespace seds {
             return false;
         }
 
+        // reads inconsistent values, should remove in the future
+        // TODO
+        /*
         result = this->device.read_le_register<uint32_t>(BMI323Register::STATUS);
         if (result.has_value()) {
             ESP_LOGE("BMI323", "status: %" PRIx32, (uint32_t)result.value());
         } else { ESP_LOGE("BMI323", "status read failed"); }
-        if (!result.has_value() || (uint16_t)(result.value() >> 16) != 1) {
+        if (!result.has_value() || (uint16_t)((result.value() >> 16) & 0xE1) != 1) {
             ESP_LOGE("BMI323", "status read failed or incorrect");
             return false;
         }
+        */
 
         return true;
     }

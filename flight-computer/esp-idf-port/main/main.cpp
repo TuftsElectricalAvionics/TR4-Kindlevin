@@ -15,7 +15,7 @@
 #include "errors.h"
 #include "sd.h"
 
-static const char *TAG = "example";
+static const char *TAG = "main";
 
 using namespace seds::errors;
 
@@ -28,8 +28,11 @@ extern "C" void app_main()
 
     // should we have a template function for calling `create`?
 
-    //seds::BMP581 baro_sensor_1 = unwrap(seds::BMP581::create( unwrap(i2c->get_device(seds::BMP581::address_1)) ));
-    //seds::BMP581 baro_sensor_2 = unwrap(seds::BMP581::create( unwrap(i2c->get_device(seds::BMP581::address_2)) ));
+    seds::BMP581 baro_sensor_1 = unwrap(seds::BMP581::create( unwrap(i2c->get_device(seds::BMP581::address_1)) ));
+    vTaskDelay(pdMS_TO_TICKS(10)); // otherwise i2c gets angry about NACKs
+
+    seds::BMP581 baro_sensor_2 = unwrap(seds::BMP581::create( unwrap(i2c->get_device(seds::BMP581::address_2)) ));
+    vTaskDelay(pdMS_TO_TICKS(10)); 
 
     //auto disp = seds::TCA6507( unwrap(i2c->get_device(0x45))); //  figure out how this works exactly!
     // remember that we need two busses - one just controls one of the 7-segment devices
@@ -50,9 +53,22 @@ extern "C" void app_main()
         ESP_LOGE(TAG, "temp sensor not connected!");
     }
 
+    
+    auto data_try = baro_sensor_1.read_data();
+    auto data_try_2 = baro_sensor_2.read_data();
+    if (!data_try.has_value() || !data_try_2.has_value()) {
+        ESP_LOGE(TAG, "baro data read failed");
+    } else {
+        seds::BarometerData data1 = data_try.value();
+        seds::BarometerData data2 = data_try_2.value();
+        ESP_LOGI(TAG, "baro 1 temp: %f, baro 2 temp: %f, baro 1 pressure: %f, baro 2 pressure: %f", 
+            data1.baro_temp, data2.baro_temp, data1.pressure, data2.pressure);
+    }
+    
+
+    /*
     seds::SDCard sd = unwrap(seds::SDCard::create());
 
-    
     auto fc = seds::FlightComputer {
         //.baro1 = std::move(baro_sensor_1),
         //.baro2 = std::move(baro_sensor_2),
@@ -64,18 +80,6 @@ extern "C" void app_main()
     };
 
     auto init_res = fc.init();
-    if (!init_res.has_value()) {
-        ESP_LOGE(TAG, "flight computer init error: %s", init_res.error()->what());
-    }
-    errno = 0;
-    FILE* f = fopen("/sdcard/f.txt", "w");
-    if (f == NULL) {
-        ESP_LOGE(TAG, "File not created, errno");
-        perror("");
-    } else {
-        fprintf(f, "hi!\n");
-        fclose(f);
-    }
-
-    fc.process(10, false);
+    fc.process(10, true);
+    */
 }

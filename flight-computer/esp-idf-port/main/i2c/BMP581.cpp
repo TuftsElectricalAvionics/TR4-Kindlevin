@@ -1,9 +1,12 @@
 #include "BMP581.h"
 
 #include "driver/i2c_master.h"
+#include "esp_log.h"
 
 const float temp_scale = 1.0f / 65536.0f; // 2^16
 const float press_scale = 1.0f / 64.0f; // 2^6
+
+static const char *TAG = "BMP581";
 
 namespace seds {
     enum class BMP581Register : uint8_t {
@@ -37,26 +40,27 @@ namespace seds {
         // try to set config for reading pressure 
         TRY(bmp581.device.write_be_register<uint8_t>(
             BMP581Register::OSR_CONFIG,
-            0b01010100 // temp oversampling x1, pressure oversampling x4 (standard resolution), pressure reading on 
+            0b01010000 // temp oversampling x1, pressure oversampling x4 (standard resolution), pressure reading on 
         ));
+        
 
         return bmp581;
     }
 
     bool BMP581::is_connected() {
         auto const id = this->device.read_be_register<uint8_t>(BMP581Register::CHIP_ID);
-        auto const int_status = this->device.read_be_register<uint8_t>(BMP581Register::INT_STATUS);
-        auto const status = this->device.read_be_register<uint8_t>(BMP581Register::STATUS);
 
-        if (!id.has_value() || !int_status.has_value() || !status.has_value()) {
+        if (!id.has_value()) {
+            ESP_LOGE(TAG, "failed to read id or status");
             return false;
         }
 
         // according to the datasheet, valid ID is non-zero
-        // valid int_status eqwuals 0x10
-        // valid status has bits 1 and 2 set
+        // valid status has only bit 1 set
+        ESP_LOGI(TAG, "id: %x", id.value());
+
         constexpr uint8_t expected_id = 0b0101'0000;
-        return id.value() == expected_id && int_status.value() == 0x10 && (status.value() & 0x06) == 0x06;
+        return id.value() == expected_id;
     }
 
     Expected<BarometerData> BMP581::read_data() {

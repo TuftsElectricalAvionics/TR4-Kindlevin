@@ -9,7 +9,6 @@
 namespace seds {
 
 Expected<std::monostate> FlightComputer::init() {
-    // do we need to format?
     char data[] = "accel x, accel y, accel z, degrees x, degrees y, degrees z\n";
     return this->sd.create_file(FlightComputer::filename, (uint8_t *)data, sizeof(data)-1); // subtract one
 }
@@ -44,9 +43,8 @@ void FlightComputer::process(uint32_t times, bool endless) {
         // if this takes too long we should rework the api to hand out file descriptors
         // no need to flush file since this function calls fclose
         // if we switch to file descriptors we need to explicitly flush
-        ESP_LOGI("computer", "%g, %g, %g", imu_data.ax, imu_data.ay, imu_data.az);
         ESP_LOGI("computer", "%s", buffer);
-        auto append_res = sd.append_file(FlightComputer::filename, (uint8_t *)buffer, idx + 1); // add one to include newline but not null terminator
+        auto append_res = sd.append_file(FlightComputer::filename, (uint8_t *)buffer, idx + 2); // add two to include newline but not null terminator
         if (!append_res.has_value()) {
             ESP_LOGE("computer", "flight computer append error: %s", append_res.error()->what());
         }
