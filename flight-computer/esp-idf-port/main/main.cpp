@@ -15,6 +15,7 @@
 #include "errors.h"
 #include "sd.h"
 
+
 static const char *TAG = "main";
 
 using namespace seds::errors;
@@ -81,15 +82,14 @@ extern "C" void app_main()
         ESP_LOGI(TAG, "imu ax: %f, high g ax: %f, imu ay: %f, high g ay: %f, imu az: %f, high g az: %f", 
             data2.ax, data1.h_ax, data2.ay, data1.h_ay, data2.az, data1.h_az);
     }
-
-    /*
+    
     seds::SDCard sd = unwrap(seds::SDCard::create());
 
     auto fc = seds::FlightComputer {
-        //.baro1 = std::move(baro_sensor_1),
-        //.baro2 = std::move(baro_sensor_2),
+        .baro1 = std::move(baro_sensor_1),
+        .baro2 = std::move(baro_sensor_2),
         .imu = std::move(imu),
-        //.high_g_accel = std::move(high_g),
+        .high_g_accel = std::move(high_g),
         //.mag = std::move(mag_sensor),
         .temp = std::move(temp_sensor),
         .sd = std::move(sd)
@@ -97,5 +97,4 @@ extern "C" void app_main()
 
     auto init_res = fc.init();
     fc.process(10, true);
-    */
 }

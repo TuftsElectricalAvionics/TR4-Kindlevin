@@ -170,9 +170,6 @@ namespace seds {
         auto accel_range = static_cast<size_t>(this->accel_range);
         auto gyro_range = static_cast<size_t>(this->gyro_range);
 
-        ESP_LOGI("BMI323", "ax raw: %d, ay raw: %d, az raw: %d, accel range: %f",
-            ax_raw, ay_raw, az_raw, accel_divisors[accel_range]);
-
         IMUData data = {
             .ax = static_cast<float>(ax_raw) / accel_divisors[accel_range],
             .ay = static_cast<float>(ay_raw) / accel_divisors[accel_range],

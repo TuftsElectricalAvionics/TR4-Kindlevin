@@ -28,6 +28,7 @@ const gpio_num_t PIN_NUM_CS = (gpio_num_t)5;
 // Or malloc (bad for performance)
 // Here, the user just writes MOUNT_POINT/path
 #define MOUNT_POINT "/sdcard"
+#define MOUNT_POINT_LEN (sizeof(MOUNT_POINT))
 
 // Example reference:
 // https://github.com/espressif/esp-idf/blob/v5.5.2/examples/storage/sd_card/sdspi/main/sd_card_example_main.c
