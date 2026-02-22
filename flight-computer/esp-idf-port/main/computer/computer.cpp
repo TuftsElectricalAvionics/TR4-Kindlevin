@@ -23,7 +23,7 @@ Expected<std::monostate> FlightComputer::init() {
         // TODO
         // also improve interface so we dont have to do what we do in process()
         snprintf(this->filename, FlightComputer::buf_len, "%s/data%d.csv", MOUNT_POINT, i);
-        ESP_LOGI("computer", "filename: %s, res: %d, size: %d", this->filename, stat(this->filename, &st), st.st_size);
+        ESP_LOGI("computer", "filename: %s, res: %d", this->filename, stat(this->filename, &st));
         if (stat(this->filename, &st) == -1) {
             // doesn't exist, we go with it
             broke = true;
@@ -39,7 +39,7 @@ Expected<std::monostate> FlightComputer::init() {
     return this->sd.create_file(this->filename, (uint8_t *)data, sizeof(data)-1); // subtract one
 }
 
-constexpr size_t LOOPS_BEFORE_FLUSH = 10;
+constexpr size_t LOOPS_BEFORE_FLUSH = 100;
 char buffer[LOOPS_BEFORE_FLUSH * (40 + 14 * 20 + 13 + 1 + 1)];
 
 void FlightComputer::process(uint32_t times, bool endless) {

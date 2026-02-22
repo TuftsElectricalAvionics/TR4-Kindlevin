@@ -52,9 +52,11 @@ namespace seds {
     
     Expected<HighGAccelData> HighGAccel::read_acceleration() {
         // FIXME: read all sensors at once
-        auto x = TRY(this->device.read_le_register<int16_t>(ADXL375Register::DATAX0));
-        auto y = TRY(this->device.read_le_register<int16_t>(ADXL375Register::DATAY0));
-        auto z = TRY(this->device.read_le_register<int16_t>(ADXL375Register::DATAZ0));
+        auto raw_data = TRY(this->device.read_le_register<uint64_t>(ADXL375Register::DATAX0)) & 0xFFFFFFFFFFFF;
+
+        auto x = (int16_t)raw_data;
+        auto y = (int16_t)(raw_data >> 16);
+        auto z = (int16_t)(raw_data >> 32);
 
         HighGAccelData data;
         data.h_ax = static_cast<float>(x) / accel_sense;

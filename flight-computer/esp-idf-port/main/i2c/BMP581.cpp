@@ -64,8 +64,9 @@ namespace seds {
     }
 
     Expected<BarometerData> BMP581::read_data() {
-        int32_t raw_temp = TRY(this->device.read_le_register<uint32_t>(BMP581Register::TMP_DATA)) & 0xFFFFFF;
-        int32_t raw_press = TRY(this->device.read_le_register<uint32_t>(BMP581Register::PRESS_DATA)) & 0xFFFFFF;
+        uint64_t raw_data = TRY(this->device.read_le_register<uint64_t>(BMP581Register::TMP_DATA));
+        int32_t raw_temp = raw_data & 0xFFFFFF; //TRY(this->device.read_le_register<uint32_t>(BMP581Register::TMP_DATA)) & 0xFFFFFF;
+        int32_t raw_press = (raw_data >> 24) & 0xFFFFFF;//TRY(this->device.read_le_register<uint32_t>(BMP581Register::PRESS_DATA)) & 0xFFFFFF;
 
         BarometerData data;
         data.baro_temp = static_cast<float>(raw_temp) * temp_scale;
