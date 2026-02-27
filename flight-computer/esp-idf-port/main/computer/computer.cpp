@@ -90,10 +90,17 @@ void FlightComputer::process(uint32_t times, bool endless) {
             ESP_LOGE(TAG, "temp data read failed");
         } 
         // time
-        idx += snprintf(&buffer[idx], 40, "%lld", time_ms);
-        buffer[idx] = ','; 
-        idx += 1;
+        //idx += snprintf(&buffer[idx], 40, "%lld", time_ms);
+        //buffer[idx] = ','; 
+        //idx += 1;
         // imu
+        idx += snprintf(&buffer[idx], 40 + 20 * 14 + 14, "%lld,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
+            time_ms,
+            imu_data.ax, imu_data.ay, imu_data.az, imu_data.gx, imu_data.gy, imu_data.gz,
+            baro_1_data.baro_temp, baro_1_data.pressure, baro_2_data.baro_temp, baro_2_data.pressure,
+            high_g_data.h_ax, high_g_data.h_ay, high_g_data.h_az, tmp
+        );
+        /*
         idx += snprintf(&buffer[idx], 20, "%g", imu_data.ax);
         buffer[idx] = ','; 
         idx += 1;
@@ -112,7 +119,14 @@ void FlightComputer::process(uint32_t times, bool endless) {
         idx += snprintf(&buffer[idx], 20, "%g", imu_data.gz);
         buffer[idx] = ','; 
         idx += 1; 
+        */
         // baro 1
+        /*
+        idx += snprintf(&buffer[idx], 20 * 4 + 4, "%g,%g,%g,%g,",
+            baro_1_data.baro_temp, baro_1_data.pressure, baro_2_data.baro_temp, baro_2_data.pressure
+        );
+        */
+        /*
         idx += snprintf(&buffer[idx], 20, "%g", baro_1_data.baro_temp);
         buffer[idx] = ','; 
         idx += 1; 
@@ -126,7 +140,14 @@ void FlightComputer::process(uint32_t times, bool endless) {
         idx += snprintf(&buffer[idx], 20, "%g", baro_2_data.pressure);
         buffer[idx] = ','; 
         idx += 1; 
+        */
         // high g
+        /*
+        idx += snprintf(&buffer[idx], 20 * 4 + 4, "%g,%g,%g,%g\n",
+            high_g_data.h_ax, high_g_data.h_ay, high_g_data.h_az, tmp
+        );
+        */
+        /*
         idx += snprintf(&buffer[idx], 20, "%g", high_g_data.h_ax);
         buffer[idx] = ','; 
         idx += 1; 
@@ -140,6 +161,7 @@ void FlightComputer::process(uint32_t times, bool endless) {
         idx += snprintf(&buffer[idx], 20, "%g", tmp);
         buffer[idx] = '\n';
         idx += 1;
+        */
 
         // if this takes too long we should rework the api to hand out file descriptors
         // no need to flush file since this function calls fclose
