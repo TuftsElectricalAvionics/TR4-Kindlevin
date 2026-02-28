@@ -43,6 +43,8 @@ constexpr size_t LOOPS_BEFORE_FLUSH = 100;
 char buffer[LOOPS_BEFORE_FLUSH * (40 + 14 * 20 + 13 + 1 + 1)];
 
 void FlightComputer::process(uint32_t times, bool endless) {
+    FILE *data_file = fopen(this->filename, "a");
+
     struct timeval tv_now;
     memset(buffer, 'X', sizeof(buffer));
     size_t idx = 0;
@@ -89,92 +91,49 @@ void FlightComputer::process(uint32_t times, bool endless) {
         } else {
             ESP_LOGE(TAG, "temp data read failed");
         } 
-        // time
-        //idx += snprintf(&buffer[idx], 40, "%lld", time_ms);
-        //buffer[idx] = ','; 
-        //idx += 1;
-        // imu
+       
+        /*
         idx += snprintf(&buffer[idx], 40 + 20 * 14 + 14, "%lld,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
             time_ms,
             imu_data.ax, imu_data.ay, imu_data.az, imu_data.gx, imu_data.gy, imu_data.gz,
             baro_1_data.baro_temp, baro_1_data.pressure, baro_2_data.baro_temp, baro_2_data.pressure,
             high_g_data.h_ax, high_g_data.h_ay, high_g_data.h_az, tmp
         );
-        /*
-        idx += snprintf(&buffer[idx], 20, "%g", imu_data.ax);
-        buffer[idx] = ','; 
-        idx += 1;
-        idx += snprintf(&buffer[idx], 20, "%g", imu_data.ay); 
-        buffer[idx] = ','; 
-        idx += 1; 
-        idx += snprintf(&buffer[idx], 20, "%g", imu_data.az);
-        buffer[idx] = ','; 
-        idx += 1; 
-        idx += snprintf(&buffer[idx], 20, "%g", imu_data.gx);
-        buffer[idx] = ','; 
-        idx += 1; 
-        idx += snprintf(&buffer[idx], 20, "%g", imu_data.gy);
-        buffer[idx] = ','; 
-        idx += 1; 
-        idx += snprintf(&buffer[idx], 20, "%g", imu_data.gz);
-        buffer[idx] = ','; 
-        idx += 1; 
         */
-        // baro 1
-        /*
-        idx += snprintf(&buffer[idx], 20 * 4 + 4, "%g,%g,%g,%g,",
-            baro_1_data.baro_temp, baro_1_data.pressure, baro_2_data.baro_temp, baro_2_data.pressure
-        );
-        */
-        /*
-        idx += snprintf(&buffer[idx], 20, "%g", baro_1_data.baro_temp);
-        buffer[idx] = ','; 
-        idx += 1; 
-        idx += snprintf(&buffer[idx], 20, "%g", baro_1_data.pressure);
-        buffer[idx] = ','; 
-        idx += 1; 
-        // baro 2
-        idx += snprintf(&buffer[idx], 20, "%g", baro_2_data.baro_temp);
-        buffer[idx] = ','; 
-        idx += 1; 
-        idx += snprintf(&buffer[idx], 20, "%g", baro_2_data.pressure);
-        buffer[idx] = ','; 
-        idx += 1; 
-        */
-        // high g
-        /*
-        idx += snprintf(&buffer[idx], 20 * 4 + 4, "%g,%g,%g,%g\n",
+
+        // snprintf will be better for multicore buffer, but this hack is more consistent
+        fprintf(data_file, "%lld,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
+            time_ms,
+            imu_data.ax, imu_data.ay, imu_data.az, imu_data.gx, imu_data.gy, imu_data.gz,
+            baro_1_data.baro_temp, baro_1_data.pressure, baro_2_data.baro_temp, baro_2_data.pressure,
             high_g_data.h_ax, high_g_data.h_ay, high_g_data.h_az, tmp
         );
-        */
-        /*
-        idx += snprintf(&buffer[idx], 20, "%g", high_g_data.h_ax);
-        buffer[idx] = ','; 
-        idx += 1; 
-        idx += snprintf(&buffer[idx], 20, "%g", high_g_data.h_ay);
-        buffer[idx] = ','; 
-        idx += 1; 
-        idx += snprintf(&buffer[idx], 20, "%g", high_g_data.h_az);
-        buffer[idx] = ','; 
-        idx += 1; 
-        // temp
-        idx += snprintf(&buffer[idx], 20, "%g", tmp);
-        buffer[idx] = '\n';
-        idx += 1;
-        */
-
-        // if this takes too long we should rework the api to hand out file descriptors
-        // no need to flush file since this function calls fclose
-        // if we switch to file descriptors we need to explicitly flush
-        //ESP_LOGI(TAG, "%s", buffer);
+        
+        // speed this up!s
         if ((i % LOOPS_BEFORE_FLUSH) == LOOPS_BEFORE_FLUSH - 1) {
             ESP_LOGI(TAG, "Flushing");
-            auto append_res = sd.append_file(FlightComputer::filename, (uint8_t *)buffer, idx);
-            if (!append_res.has_value()) {
-                ESP_LOGE(TAG, "flight computer append error: %s", append_res.error()->what());
+            errno = 0;
+            //fwrite((void *)buffer, 1, idx, data_file);
+            if (errno != 0) {
+                ESP_LOGE(TAG, "err: %s", strerror(errno));
             }
+            errno = 0;
+            fflush(data_file);
+            if (errno != 0) {
+                ESP_LOGE(TAG, "err: %s", strerror(errno));
+            }
+            errno = 0;
+            fsync(fileno(data_file));
+            if (errno != 0) {
+                ESP_LOGE(TAG, "err: %s", strerror(errno));
+            }
+            
+            //auto append_res = sd.append_file(FlightComputer::filename, (uint8_t *)buffer, idx);
+            //if (!append_res.has_value()) {
+            //    ESP_LOGE(TAG, "flight computer append error: %s", append_res.error()->what());
+            //}
 
-            memset(buffer, 'X', sizeof(buffer));
+            //memset(buffer, 'X', sizeof(buffer));
             idx = 0;
         }
 
@@ -182,6 +141,8 @@ void FlightComputer::process(uint32_t times, bool endless) {
     }
     // fixme: with finite loops we could lose data at the end
     // this will happen with infinite loops too, but there its kind of unavoidable
+
+    fclose(data_file);
 }
 
 }
