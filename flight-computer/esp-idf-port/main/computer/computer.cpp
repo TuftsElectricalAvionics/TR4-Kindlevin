@@ -92,17 +92,7 @@ void FlightComputer::process(uint32_t times, bool endless) {
             ESP_LOGE(TAG, "temp data read failed");
         } 
        
-        /*
         idx += snprintf(&buffer[idx], 40 + 20 * 14 + 14, "%lld,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
-            time_ms,
-            imu_data.ax, imu_data.ay, imu_data.az, imu_data.gx, imu_data.gy, imu_data.gz,
-            baro_1_data.baro_temp, baro_1_data.pressure, baro_2_data.baro_temp, baro_2_data.pressure,
-            high_g_data.h_ax, high_g_data.h_ay, high_g_data.h_az, tmp
-        );
-        */
-
-        // snprintf will be better for multicore buffer, but this hack is more consistent
-        fprintf(data_file, "%lld,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
             time_ms,
             imu_data.ax, imu_data.ay, imu_data.az, imu_data.gx, imu_data.gy, imu_data.gz,
             baro_1_data.baro_temp, baro_1_data.pressure, baro_2_data.baro_temp, baro_2_data.pressure,
@@ -128,16 +118,15 @@ void FlightComputer::process(uint32_t times, bool endless) {
                 ESP_LOGE(TAG, "err: %s", strerror(errno));
             }
             
-            //auto append_res = sd.append_file(FlightComputer::filename, (uint8_t *)buffer, idx);
-            //if (!append_res.has_value()) {
-            //    ESP_LOGE(TAG, "flight computer append error: %s", append_res.error()->what());
-            //}
+            auto append_res = sd.append_file(FlightComputer::filename, (uint8_t *)buffer, idx);
+            if (!append_res.has_value()) {
+                ESP_LOGE(TAG, "flight computer append error: %s", append_res.error()->what());
+            }
 
-            //memset(buffer, 'X', sizeof(buffer));
+            memset(buffer, 'X', sizeof(buffer));
             idx = 0;
         }
 
-        //vTaskDelay(pdMS_TO_TICKS(1000));
     }
     // fixme: with finite loops we could lose data at the end
     // this will happen with infinite loops too, but there its kind of unavoidable
