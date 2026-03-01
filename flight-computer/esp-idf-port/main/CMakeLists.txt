@@ -1,5 +1,4 @@
-idf_component_register(SRCS "main.cpp"
-        "sd.cpp"
+idf_component_register(SRCS "computer/computer.cpp" "sd.cpp" "main.cpp"
         "i2c/I2C.cpp"
         "i2c/TMP1075.cpp"
         "i2c/high_g_accel.cpp"

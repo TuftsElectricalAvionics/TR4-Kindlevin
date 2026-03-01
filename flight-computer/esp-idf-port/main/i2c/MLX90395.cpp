@@ -20,7 +20,6 @@ namespace seds {
 
     Expected<MLX90395> MLX90395::create(I2CDevice&& device) {
         MLX90395 sensor(std::move(device));
-
         uint16_t gain_sel = (TRY(sensor.device.read_be_register<uint16_t>(MLX90395Register::GAIN_SEL)) >> 4) & 0xF;
         switch (gain_sel) {
             case 8:   sensor.lsb = 7.14; break;
@@ -32,7 +31,6 @@ namespace seds {
         sensor.gain_sel = gain_sel;
         
         ESP_LOGI("MLX90395", "MLX90395 Magnometer created");
-
         return sensor;
     } 
 
@@ -53,9 +51,9 @@ namespace seds {
 
     Expected<MLX90395Data> MLX90395::read_magnetic_field() {
         
-        uint16_t x_data = TRY(this->device.read_be_register<u_int16_t>(MLX90395Register::X_DATA));
-        uint16_t y_data = TRY(this->device.read_be_register<u_int16_t>(MLX90395Register::Y_DATA));
-        uint16_t z_data = TRY(this->device.read_be_register<u_int16_t>(MLX90395Register::Z_DATA));
+        uint16_t x_data = TRY(this->device.read_be_register<uint16_t>(MLX90395Register::X_DATA));
+        uint16_t y_data = TRY(this->device.read_be_register<uint16_t>(MLX90395Register::Y_DATA));
+        uint16_t z_data = TRY(this->device.read_be_register<uint16_t>(MLX90395Register::Z_DATA));
 
         MLX90395Data data;
         data.mx = static_cast<float>(x_data) * this->lsb * gain_sel_table[this->gain_sel];

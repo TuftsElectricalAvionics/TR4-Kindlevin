@@ -10,14 +10,14 @@ namespace seds {
         float pressure;
     };
 
-    class BMP581 {
+    class BMP581 : std::enable_shared_from_this<BMP581> {
     public:
         // No default address since there are two, so we should specify each
         static constexpr int16_t address_1 = 0x46;
         static constexpr int16_t address_2 = 0x47;
 
         [[nodiscard]]
-        Expected<BMP581> create(I2CDevice&& device);
+        static Expected<BMP581> create(I2CDevice&& device);
 
         // No copies allowed since we hold unique state
         BMP581(BMP581&&) = default;
