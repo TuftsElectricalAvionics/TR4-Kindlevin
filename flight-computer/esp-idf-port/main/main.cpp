@@ -20,6 +20,14 @@ static const char *TAG = "main";
 
 using namespace seds::errors;
 
+struct lt2_arg {
+    int id;
+    TaskHandle_t handle;
+};
+
+void log_task(void*);
+void log_task_2(void*);
+
 extern "C" void app_main()
 {
     ESP_LOGI(TAG, "Hello!");
@@ -95,6 +103,76 @@ extern "C" void app_main()
         .sd = std::move(sd)
     };
 
-    auto init_res = fc.init();
-    fc.process(10, true);
+    //Allow other core to finish initialization
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    auto t_core = 1;
+    if (CONFIG_ESP_MAIN_TASK_AFFINITY == t_core) {
+        t_core = 0;
+    }
+    int priority = 5; // higher than main task
+    TaskHandle_t t1_h;
+
+    struct lt2_arg t2;
+    t2.id = 2;
+    struct lt2_arg t3;
+    t3.id = 3;
+
+    xTaskCreatePinnedToCore(log_task, "logging_task", 4096, (void*)&t1_h, priority + 1, &t1_h, t_core); // don't know what priority to use
+    
+    xTaskCreatePinnedToCore(log_task_2, "logging_task_2", 4096, (void*)&t2, priority, &t2.handle, t_core);
+    xTaskCreatePinnedToCore(log_task_2, "logging_task_3", 4096, (void*)&t3, priority, &t3.handle, CONFIG_ESP_MAIN_TASK_AFFINITY);
+
+    vTaskSuspend(NULL);
+
+    /*
+    struct timeval tv_now;
+    for (int i = 0; true; i++) {
+        gettimeofday(&tv_now, NULL);
+        int64_t time_ms = (int64_t)tv_now.tv_sec * 1000L + (int64_t)tv_now.tv_usec / 1000L;
+        ESP_LOGI("main core task", "iteration: %d, time: %lld, core: %d", i, time_ms, xTaskGetCoreID());
+    }
+        */
+    //auto init_res = fc.init();
+    //fc.process(10, true);
+}
+
+static void spin_iteration(int);
+
+void log_task(void* ptr) {
+    TaskHandle_t handle = *(TaskHandle_t *)ptr;
+
+    struct timeval tv_now;
+    for (int i = 0; true; i++) {
+        gettimeofday(&tv_now, NULL);
+        int64_t time_ms_orig = (int64_t)tv_now.tv_sec * 1000L + (int64_t)tv_now.tv_usec / 1000L;
+        int64_t time_ms = time_ms_orig;
+        while (time_ms - time_ms_orig < 100) {
+            spin_iteration(100);
+            gettimeofday(&tv_now, NULL);
+            time_ms = (int64_t)tv_now.tv_sec * 1000L + (int64_t)tv_now.tv_usec / 1000L;
+        }
+
+        ESP_LOGI("other core task", "iteration: %d, time: %lld, core: %d", i, time_ms, xTaskGetCoreID(handle));
+    }
+}
+
+void log_task_2(void *ptr) {
+    lt2_arg arg = *(lt2_arg *)ptr;
+
+    struct timeval tv_now;
+    char tag[100];
+    snprintf(tag, 100, "task #%d", arg.id);
+    for (int i = 0; true; i++) {
+        gettimeofday(&tv_now, NULL);
+        int64_t time_ms = (int64_t)tv_now.tv_sec * 1000L + (int64_t)tv_now.tv_usec / 1000L;
+        ESP_LOGI(tag, "iteration: %d, time: %lld, core: %d", i, time_ms, xTaskGetCoreID(arg.handle));
+    }
+}
+
+static void spin_iteration(int spin_iter_num)
+{
+    for (int i = 0; i < spin_iter_num; i++) {
+        __asm__ __volatile__("NOP");
+    }
 }
