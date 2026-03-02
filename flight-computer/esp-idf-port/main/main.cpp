@@ -118,7 +118,9 @@ extern "C" void app_main()
     struct lt2_arg t3;
     t3.id = 3;
 
-    xTaskCreatePinnedToCore(log_task, "logging_task", 4096, (void*)&t1_h, priority + 1, &t1_h, t_core); // don't know what priority to use
+    // passing arguments via a stack variable is actually UB!
+    // don't do this in real code!
+    xTaskCreatePinnedToCore(log_task, "logging_task", 4096, (void*)&t1_h, priority + 1, &t1_h, t_core);
     
     xTaskCreatePinnedToCore(log_task_2, "logging_task_2", 4096, (void*)&t2, priority, &t2.handle, t_core);
     xTaskCreatePinnedToCore(log_task_2, "logging_task_3", 4096, (void*)&t3, priority, &t3.handle, CONFIG_ESP_MAIN_TASK_AFFINITY);
