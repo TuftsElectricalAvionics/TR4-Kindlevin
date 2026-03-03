@@ -1,6 +1,7 @@
 #include "computer.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -40,14 +41,17 @@ Expected<std::monostate> FlightComputer::init() {
 }
 
 constexpr size_t LOOPS_BEFORE_FLUSH = 100;
-char buffer[LOOPS_BEFORE_FLUSH * (40 + 14 * 20 + 13 + 1 + 1)];
+constexpr size_t BUF_LEN = LOOPS_BEFORE_FLUSH * (40 + 14 * 20 + 13 + 1 + 1);
+char buffer[BUF_LEN];
 
 void FlightComputer::process(uint32_t times, bool endless) {
-    FILE *data_file = fopen(this->filename, "a");
-
     struct timeval tv_now;
     memset(buffer, 'X', sizeof(buffer));
-    size_t idx = 0;
+    std::atomic<size_t> idx = {0};
+
+    // spawn other task
+    this->sd.create_log_task(this->filename, (uint8_t *)buffer, BUF_LEN, &idx, 1000);
+
     for (int i = 0; i < times || endless; i++) {
         gettimeofday(&tv_now, NULL);
         int64_t time_ms = (int64_t)tv_now.tv_sec * 1000L + (int64_t)tv_now.tv_usec / 1000L;
@@ -92,16 +96,20 @@ void FlightComputer::process(uint32_t times, bool endless) {
             ESP_LOGE(TAG, "temp data read failed");
         } 
        
-        idx += snprintf(&buffer[idx], 40 + 20 * 14 + 14, "%lld,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
+        size_t inc = snprintf(&buffer[idx], 40 + 20 * 14 + 14, "%lld,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
             time_ms,
             imu_data.ax, imu_data.ay, imu_data.az, imu_data.gx, imu_data.gy, imu_data.gz,
             baro_1_data.baro_temp, baro_1_data.pressure, baro_2_data.baro_temp, baro_2_data.pressure,
             high_g_data.h_ax, high_g_data.h_ay, high_g_data.h_az, tmp
         );
+
+        idx.fetch_add(inc, std::memory_order_acq_rel);
         
-        // speed this up!s
+        // speed this up
+        
         if ((i % LOOPS_BEFORE_FLUSH) == LOOPS_BEFORE_FLUSH - 1) {
             ESP_LOGI(TAG, "Flushing");
+            /*
             errno = 0;
             //fwrite((void *)buffer, 1, idx, data_file);
             if (errno != 0) {
@@ -117,21 +125,15 @@ void FlightComputer::process(uint32_t times, bool endless) {
             if (errno != 0) {
                 ESP_LOGE(TAG, "err: %s", strerror(errno));
             }
-            
-            auto append_res = sd.append_file(FlightComputer::filename, (uint8_t *)buffer, idx);
-            if (!append_res.has_value()) {
-                ESP_LOGE(TAG, "flight computer append error: %s", append_res.error()->what());
-            }
 
             memset(buffer, 'X', sizeof(buffer));
-            idx = 0;
+            */
+           idx.store(0, std::memory_order_relaxed);
         }
 
+        // allow printing task to overtake for now
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
-    // fixme: with finite loops we could lose data at the end
-    // this will happen with infinite loops too, but there its kind of unavoidable
-
-    fclose(data_file);
 }
 
 }

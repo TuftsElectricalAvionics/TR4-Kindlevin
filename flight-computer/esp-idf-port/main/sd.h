@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <expected>
 #include <sys/unistd.h>
 #include <sys/stat.h>
@@ -47,6 +48,11 @@ namespace seds {
 
         Expected<std::monostate> create_file(const char* path, const uint8_t* data, size_t length);
 
+        // inefficient - don't use
+        // if you need specific access just use posix functions for now
+        // TODO - figure out how to control file function access 
+
+        /*
         // Don't allocate for the user so that they have the option to use a predefined buffer
         /// Make sure to add a null-terminator if needed
         Expected<std::monostate> read_file(const char *path, uint8_t* buffer, size_t length);
@@ -61,6 +67,11 @@ namespace seds {
         Expected<std::monostate> format_fatfs();
 
         Expected<struct stat> stat_file(const char* path);
+        */
+        // TODO: how to signal error from this task?
+
+        // TODO: can we do this without atomics?
+        Expected<std::monostate> create_log_task(const char* path, uint8_t* buffer, size_t buf_len, std::atomic<size_t> *insert_idx, size_t min_size);
         
     private:
         //SDCard(sdmmc_card_t *v_card, sdmmc_host_t v_host) :  card(v_card), host(v_host) {}

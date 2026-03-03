@@ -2,6 +2,8 @@
 #include <string.h>
 
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 esp_vfs_fat_sdmmc_mount_config_t mount_cfg;
 sdmmc_card_t *card;
@@ -44,6 +46,96 @@ Expected<SDCard> SDCard::create() {
 
     return SDCard();
 }
+
+struct log_args {
+    FILE* file;
+    uint8_t* buffer;
+    size_t buf_len;
+    std::atomic<size_t> *insert_idx;
+    size_t min_size;
+};
+
+// pulled out to function to make code clearer
+// shouldn't be slow since it's one line and we tell c++ to inline
+// maybe optimize this to avoid branches? probably doesn't matter though
+inline size_t wrap_around_diff(int32_t x, int32_t y, int32_t modulus) {
+    if (x > y) {
+        return (size_t)(x - y);
+    }
+    return (size_t)(x + modulus - y); 
+}
+
+void logging_task(void *arg_ptr) {
+    struct log_args args = *(struct log_args *)arg_ptr;
+    size_t remove_idx = 0;
+    while (true) {
+        size_t insert_idx = args.insert_idx->load(std::memory_order_relaxed); // prevent changing out from under us
+        if (wrap_around_diff((int32_t)insert_idx, (int32_t)remove_idx, (int32_t)args.buf_len) < args.min_size) { continue; }
+        // todo - have specific name for tag?
+        if (insert_idx > remove_idx) {
+            ESP_LOGI("sd_log_task", "%.*s", insert_idx - remove_idx, &args.buffer[remove_idx]);
+        } else {
+            // log in two parts
+            ESP_LOGI("sd_log_task", "%.*s", args.buf_len - remove_idx, &args.buffer[remove_idx]);
+            ESP_LOGI("sd_log_task", "%.*s", insert_idx, &args.buffer[0]);
+        }
+        remove_idx = insert_idx;
+    }
+}
+
+Expected<std::monostate> SDCard::create_log_task(const char* path, uint8_t* buffer, size_t buf_len, std::atomic<size_t> *insert_idx, size_t min_size) {
+    errno = 0;
+    FILE *f = fopen(path, "a");
+    if (f == NULL) {
+        // save error
+        auto error = errno;
+        if (error == ENOMEM) {
+            return std::unexpected(std::make_unique<std::runtime_error>(std::runtime_error("failed to allocate memory for file")));
+        }
+        if (error == EDQUOT) {
+            return std::unexpected(std::make_unique<std::runtime_error>(std::runtime_error("no space on card for file")));
+        }
+        if (error == EINVAL) {
+            return std::unexpected(std::make_unique<std::runtime_error>(std::runtime_error("file basename was invalid")));
+        }
+        if (error == EISDIR) {
+            return std::unexpected(std::make_unique<std::runtime_error>(std::runtime_error("file points to directory")));
+        }
+        if (error == ENAMETOOLONG) {
+            return std::unexpected(std::make_unique<std::runtime_error>(std::runtime_error("path was too long")));
+        }
+        if (error == ENOENT) {
+            return std::unexpected(std::make_unique<std::runtime_error>(std::runtime_error("a directory in the path did not exist")));
+        }
+        else {
+            return std::unexpected(std::make_unique<std::runtime_error>(std::runtime_error(strerror(error))));
+        }
+    }
+
+    // must be created on heap
+    // could be statically allocated somewhere, but I don't think that's necessary
+    struct log_args *args = (struct log_args*)malloc(sizeof(log_args));
+
+    args->file = f;
+    args->buffer = buffer;
+    args->buf_len = buf_len;
+    args->insert_idx = insert_idx;
+    args->min_size = min_size;
+
+    // Force this task on the other core
+    // TODO: give option to specify core?
+    auto t_core = 1;
+    if (CONFIG_ESP_MAIN_TASK_AFFINITY == t_core) {
+        t_core = 0;
+    }
+
+    int priority = 1; // same than main task
+
+    xTaskCreatePinnedToCore(logging_task, "logging_task", 4096, (void*)args, priority, NULL, t_core);
+
+    return {};
+}
+
 
 Expected<std::monostate> SDCard::create_file(const char* path, const uint8_t* data, size_t length) {
     errno = 0;
@@ -116,6 +208,7 @@ Expected<std::monostate> SDCard::create_file(const char* path, const uint8_t* da
     return {};
 }
 
+/*
 Expected<std::monostate> SDCard::append_file(const char *path, const uint8_t *data, size_t length) {
     errno = 0;
     FILE *f = fopen(path, "a");
@@ -340,5 +433,6 @@ Expected<struct stat> SDCard::stat_file(const char* path) {
 
     return st;
 }
+*/
 
 }

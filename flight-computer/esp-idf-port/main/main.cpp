@@ -106,37 +106,8 @@ extern "C" void app_main()
     //Allow other core to finish initialization
     vTaskDelay(pdMS_TO_TICKS(100));
 
-    auto t_core = 1;
-    if (CONFIG_ESP_MAIN_TASK_AFFINITY == t_core) {
-        t_core = 0;
-    }
-    int priority = 5; // higher than main task
-    TaskHandle_t t1_h;
-
-    struct lt2_arg t2;
-    t2.id = 2;
-    struct lt2_arg t3;
-    t3.id = 3;
-
-    // passing arguments via a stack variable is actually UB!
-    // don't do this in real code!
-    xTaskCreatePinnedToCore(log_task, "logging_task", 4096, (void*)&t1_h, priority + 1, &t1_h, t_core);
-    
-    xTaskCreatePinnedToCore(log_task_2, "logging_task_2", 4096, (void*)&t2, priority, &t2.handle, t_core);
-    xTaskCreatePinnedToCore(log_task_2, "logging_task_3", 4096, (void*)&t3, priority, &t3.handle, CONFIG_ESP_MAIN_TASK_AFFINITY);
-
-    vTaskSuspend(NULL);
-
-    /*
-    struct timeval tv_now;
-    for (int i = 0; true; i++) {
-        gettimeofday(&tv_now, NULL);
-        int64_t time_ms = (int64_t)tv_now.tv_sec * 1000L + (int64_t)tv_now.tv_usec / 1000L;
-        ESP_LOGI("main core task", "iteration: %d, time: %lld, core: %d", i, time_ms, xTaskGetCoreID());
-    }
-        */
-    //auto init_res = fc.init();
-    //fc.process(10, true);
+    auto init_res = fc.init();
+    fc.process(10, true);
 }
 
 static void spin_iteration(int);
