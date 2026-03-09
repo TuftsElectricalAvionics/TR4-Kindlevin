@@ -53,6 +53,7 @@ struct log_args {
     size_t buf_len;
     std::atomic<size_t> *insert_idx;
     size_t min_size;
+    std::atomic<bool> *sd_sem;
 };
 
 // pulled out to function to make code clearer
@@ -68,22 +69,34 @@ inline size_t wrap_around_diff(int32_t x, int32_t y, int32_t modulus) {
 void logging_task(void *arg_ptr) {
     struct log_args args = *(struct log_args *)arg_ptr;
     size_t remove_idx = 0;
+    struct timeval tv_now;
     while (true) {
-        size_t insert_idx = args.insert_idx->load(std::memory_order_relaxed); // prevent changing out from under us
-        if (wrap_around_diff((int32_t)insert_idx, (int32_t)remove_idx, (int32_t)args.buf_len) < args.min_size) { continue; }
-        // todo - have specific name for tag?
-        if (insert_idx > remove_idx) {
-            ESP_LOGI("sd_log_task", "%.*s", insert_idx - remove_idx, &args.buffer[remove_idx]);
-        } else {
-            // log in two parts
-            ESP_LOGI("sd_log_task", "%.*s", args.buf_len - remove_idx, &args.buffer[remove_idx]);
-            ESP_LOGI("sd_log_task", "%.*s", insert_idx, &args.buffer[0]);
-        }
-        remove_idx = insert_idx;
+        if (!args.sd_sem->load(std::memory_order_seq_cst)) {
+            gettimeofday(&tv_now, NULL);
+            int64_t time_ms = (int64_t)tv_now.tv_sec * 1000L + (int64_t)tv_now.tv_usec / 1000L;
+
+            size_t insert_idx = args.insert_idx->load(std::memory_order_relaxed); // prevent changing out from under us
+            if (wrap_around_diff((int32_t)insert_idx, (int32_t)remove_idx, (int32_t)args.buf_len) < args.min_size) { continue; }
+            // todo - have specific name for tag?
+            if (insert_idx > remove_idx) {
+                ESP_LOGI("sd_log_task", "%lld: %.*s", time_ms, insert_idx - remove_idx, &args.buffer[remove_idx]);
+
+                fwrite(&args.buffer[remove_idx], 1, insert_idx - remove_idx, args.file);
+            } else {
+                // log in two parts
+                ESP_LOGI("sd_log_task", "%lld: %.*s", time_ms, args.buf_len - remove_idx, &args.buffer[remove_idx]);
+                fwrite(&args.buffer[remove_idx], 1, args.buf_len - remove_idx, args.file);
+                ESP_LOGI("sd_log_task", "%lld: %.*s", time_ms, insert_idx, &args.buffer[0]);
+                fwrite(&args.buffer[0], 1, insert_idx, args.file);
+            }
+            fflush(args.file);
+            fsync(fileno(args.file));
+            remove_idx = insert_idx;
+       }
     }
 }
 
-Expected<std::monostate> SDCard::create_log_task(const char* path, uint8_t* buffer, size_t buf_len, std::atomic<size_t> *insert_idx, size_t min_size) {
+Expected<TaskHandle_t> SDCard::create_log_task(const char* path, uint8_t* buffer, size_t buf_len, std::atomic<size_t> *insert_idx, size_t min_size, std::atomic<bool> *sd_sem) {
     errno = 0;
     FILE *f = fopen(path, "a");
     if (f == NULL) {
@@ -121,6 +134,7 @@ Expected<std::monostate> SDCard::create_log_task(const char* path, uint8_t* buff
     args->buf_len = buf_len;
     args->insert_idx = insert_idx;
     args->min_size = min_size;
+    args->sd_sem = sd_sem;
 
     // Force this task on the other core
     // TODO: give option to specify core?
@@ -130,10 +144,10 @@ Expected<std::monostate> SDCard::create_log_task(const char* path, uint8_t* buff
     }
 
     int priority = 1; // same than main task
+    TaskHandle_t handle;
+    xTaskCreatePinnedToCore(logging_task, "logging_task", 4096, (void*)args, priority, &handle, t_core);
 
-    xTaskCreatePinnedToCore(logging_task, "logging_task", 4096, (void*)args, priority, NULL, t_core);
-
-    return {};
+    return handle;
 }
 
 

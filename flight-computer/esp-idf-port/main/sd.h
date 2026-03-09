@@ -71,7 +71,7 @@ namespace seds {
         // TODO: how to signal error from this task?
 
         // TODO: can we do this without atomics?
-        Expected<std::monostate> create_log_task(const char* path, uint8_t* buffer, size_t buf_len, std::atomic<size_t> *insert_idx, size_t min_size);
+        Expected<TaskHandle_t> create_log_task(const char* path, uint8_t* buffer, size_t buf_len, std::atomic<size_t> *insert_idx, size_t min_size, std::atomic<bool> *sd_sem);
         
     private:
         //SDCard(sdmmc_card_t *v_card, sdmmc_host_t v_host) :  card(v_card), host(v_host) {}

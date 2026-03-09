@@ -45,12 +45,29 @@ constexpr size_t BUF_LEN = LOOPS_BEFORE_FLUSH * (40 + 14 * 20 + 13 + 1 + 1);
 char buffer[BUF_LEN];
 
 void FlightComputer::process(uint32_t times, bool endless) {
+    std::atomic<bool> sd_req = {false};
+
     struct timeval tv_now;
     memset(buffer, 'X', sizeof(buffer));
     std::atomic<size_t> idx = {0};
 
+    char data[] = "timestamp, accel x, accel y, accel z, degrees x, degrees y, degrees z, baro 1 temp, baro 1 pressure, baro 2 temp, baro 2 pressure, high g accel x, high g accel y, high g accel z, temp\n";
+    auto err = this->sd.create_file(MOUNT_POINT"/test1.csv", (uint8_t *)data, sizeof(data)-1);
+
+    if (!err.has_value()) {
+        ESP_LOGE(TAG, "critical error when creating test file: %s", err.error()->what());
+    }
+
+    FILE* f = fopen(MOUNT_POINT"/test1.csv", "a");
+
+    if (f == NULL) {
+        ESP_LOGE(TAG, "file pointer was null!");
+    }
+
+
     // spawn other task
-    this->sd.create_log_task(this->filename, (uint8_t *)buffer, BUF_LEN, &idx, 1000);
+    // change back to this->filename once we're done testing!
+    TaskHandle_t handle = unwrap(this->sd.create_log_task(this->filename, (uint8_t *)buffer, BUF_LEN, &idx, 1000, &sd_req));
 
     for (int i = 0; i < times || endless; i++) {
         gettimeofday(&tv_now, NULL);
@@ -102,37 +119,60 @@ void FlightComputer::process(uint32_t times, bool endless) {
             baro_1_data.baro_temp, baro_1_data.pressure, baro_2_data.baro_temp, baro_2_data.pressure,
             high_g_data.h_ax, high_g_data.h_ay, high_g_data.h_az, tmp
         );
+        ESP_LOGI(TAG, "%lld: %.*s", time_ms, inc, &buffer[idx]);
 
         idx.fetch_add(inc, std::memory_order_acq_rel);
-        
+
         // speed this up
         
         if ((i % LOOPS_BEFORE_FLUSH) == LOOPS_BEFORE_FLUSH - 1) {
-            ESP_LOGI(TAG, "Flushing");
-            /*
+            ESP_LOGI(TAG, "FLUSHING");
+            ESP_LOGI(TAG, "SUSPENDING OTHER TASK");
+
+            // ensure the other task has done its sd stuff
+            //while (xSemaphoreTake(sd_semaphore, pdMS_TO_TICKS(30)) != pdTRUE) {}
+
+            sd_req.store(true, std::memory_order_seq_cst);
+            vTaskDelay(pdMS_TO_TICKS(1000));
+
+
+            ESP_LOGI(TAG, "AQCUIRED SEMAPHORE!");
+            // accurate compare threads by preventing other thread from catching up while we write
+            vTaskSuspend(handle);
+            ESP_LOGI(TAG, "SUSPENDED OTHER TASK");
+            
             errno = 0;
-            //fwrite((void *)buffer, 1, idx, data_file);
+            size_t write_idx = (size_t)idx.load(std::memory_order_seq_cst);
+            ESP_LOGI(TAG, "Writing at idx %u", write_idx);
+            fwrite((void *)buffer, 1, write_idx, f);
             if (errno != 0) {
                 ESP_LOGE(TAG, "err: %s", strerror(errno));
             }
             errno = 0;
-            fflush(data_file);
+            fflush(f);
             if (errno != 0) {
                 ESP_LOGE(TAG, "err: %s", strerror(errno));
             }
             errno = 0;
-            fsync(fileno(data_file));
+            fsync(fileno(f));
             if (errno != 0) {
                 ESP_LOGE(TAG, "err: %s", strerror(errno));
             }
 
-            memset(buffer, 'X', sizeof(buffer));
-            */
-           idx.store(0, std::memory_order_relaxed);
+            ESP_LOGI(TAG, "sd write successful");
+            vTaskDelay(pdMS_TO_TICKS(2000));
+
+            //memset(buffer, 'X', sizeof(buffer));
+
+            idx.store(0, std::memory_order_relaxed);
+
+            ESP_LOGI(TAG, "RESUMING OTHER TASK");
+            sd_req.store(false, std::memory_order_seq_cst);
+            vTaskResume(handle);
         }
 
         // allow printing task to overtake for now
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(150));
     }
 }
 
