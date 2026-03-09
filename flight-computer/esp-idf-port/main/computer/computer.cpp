@@ -50,6 +50,7 @@ void FlightComputer::process(uint32_t times, bool endless) {
     struct timeval tv_now;
     memset(buffer, 'X', sizeof(buffer));
     std::atomic<size_t> idx = {0};
+    std::atomic<size_t> max_idx = {BUF_LEN};
 
     char data[] = "timestamp, accel x, accel y, accel z, degrees x, degrees y, degrees z, baro 1 temp, baro 1 pressure, baro 2 temp, baro 2 pressure, high g accel x, high g accel y, high g accel z, temp\n";
     auto err = this->sd.create_file(MOUNT_POINT"/test1.csv", (uint8_t *)data, sizeof(data)-1);
@@ -67,7 +68,7 @@ void FlightComputer::process(uint32_t times, bool endless) {
 
     // spawn other task
     // change back to this->filename once we're done testing!
-    TaskHandle_t handle = unwrap(this->sd.create_log_task(this->filename, (uint8_t *)buffer, BUF_LEN, &idx, 1000, &sd_req));
+    TaskHandle_t handle = unwrap(this->sd.create_log_task(this->filename, (uint8_t *)buffer, &max_idx, &idx, 1000, &sd_req));
 
     for (int i = 0; i < times || endless; i++) {
         gettimeofday(&tv_now, NULL);
@@ -163,7 +164,7 @@ void FlightComputer::process(uint32_t times, bool endless) {
             vTaskDelay(pdMS_TO_TICKS(2000));
 
             //memset(buffer, 'X', sizeof(buffer));
-
+            max_idx.store(write_idx, std::memory_order_relaxed);
             idx.store(0, std::memory_order_relaxed);
 
             ESP_LOGI(TAG, "RESUMING OTHER TASK");

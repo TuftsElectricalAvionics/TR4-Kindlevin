@@ -50,7 +50,7 @@ Expected<SDCard> SDCard::create() {
 struct log_args {
     FILE* file;
     uint8_t* buffer;
-    size_t buf_len;
+    std::atomic<size_t> *max_idx;
     std::atomic<size_t> *insert_idx;
     size_t min_size;
     std::atomic<bool> *sd_sem;
@@ -76,16 +76,17 @@ void logging_task(void *arg_ptr) {
             int64_t time_ms = (int64_t)tv_now.tv_sec * 1000L + (int64_t)tv_now.tv_usec / 1000L;
 
             size_t insert_idx = args.insert_idx->load(std::memory_order_relaxed); // prevent changing out from under us
-            if (wrap_around_diff((int32_t)insert_idx, (int32_t)remove_idx, (int32_t)args.buf_len) < args.min_size) { continue; }
+            size_t max_idx = args.max_idx->load(std::memory_order_relaxed);
+            if (wrap_around_diff((int32_t)insert_idx, (int32_t)remove_idx, (int32_t)max_idx) < args.min_size) { continue; }
             // todo - have specific name for tag?
             if (insert_idx > remove_idx) {
                 ESP_LOGI("sd_log_task", "%lld: %.*s", time_ms, insert_idx - remove_idx, &args.buffer[remove_idx]);
 
                 fwrite(&args.buffer[remove_idx], 1, insert_idx - remove_idx, args.file);
-            } else {
+            } else if (insert_idx < remove_idx) {
                 // log in two parts
-                ESP_LOGI("sd_log_task", "%lld: %.*s", time_ms, args.buf_len - remove_idx, &args.buffer[remove_idx]);
-                fwrite(&args.buffer[remove_idx], 1, args.buf_len - remove_idx, args.file);
+                ESP_LOGI("sd_log_task", "%lld: %.*s", time_ms, max_idx - remove_idx, &args.buffer[remove_idx]);
+                fwrite(&args.buffer[remove_idx], 1, max_idx - remove_idx, args.file);
                 ESP_LOGI("sd_log_task", "%lld: %.*s", time_ms, insert_idx, &args.buffer[0]);
                 fwrite(&args.buffer[0], 1, insert_idx, args.file);
             }
@@ -96,7 +97,7 @@ void logging_task(void *arg_ptr) {
     }
 }
 
-Expected<TaskHandle_t> SDCard::create_log_task(const char* path, uint8_t* buffer, size_t buf_len, std::atomic<size_t> *insert_idx, size_t min_size, std::atomic<bool> *sd_sem) {
+Expected<TaskHandle_t> SDCard::create_log_task(const char* path, uint8_t* buffer, std::atomic<size_t> *max_idx, std::atomic<size_t> *insert_idx, size_t min_size, std::atomic<bool> *sd_sem) {
     errno = 0;
     FILE *f = fopen(path, "a");
     if (f == NULL) {
@@ -131,7 +132,7 @@ Expected<TaskHandle_t> SDCard::create_log_task(const char* path, uint8_t* buffer
 
     args->file = f;
     args->buffer = buffer;
-    args->buf_len = buf_len;
+    args->max_idx = max_idx;
     args->insert_idx = insert_idx;
     args->min_size = min_size;
     args->sd_sem = sd_sem;
