@@ -58,11 +58,14 @@ float FlightComputer::pressure_to_altitude(float pressure) {
     return h_alt;
 }
 
-const float APOGEE_WINDOW = 1.0; // apogee detection window, ~ time the system will wait before deploy
+const int64_t APOGEE_WINDOW = 500; // apogee detection window, ~ ms the system will wait before deploy
 const bool BARO_AGREE_DROGUE = true; // do the barometers have to agree we've reached apogee before deploying?
 const bool BARO_AGREE_MAIN = false; // do the barometers have to agree we're below main altitude?
 
 const float MAIN_ALTITUDE = 500; // feet
+
+const bool BACKUP = false;
+const int64_t BACKUP_DELAY = 1000; // ms
 
 const size_t LOOPS_BEFORE_FLUSH = 100;
 char buffer[LOOPS_BEFORE_FLUSH * (40 + 14 * 20 + 13 + 1 + 1)];
@@ -79,6 +82,9 @@ void FlightComputer::process(uint32_t times, bool endless) {
     int64_t baro1_timestamp = 0;
     float min_baro2_pres = INFINITY;
     int64_t baro2_timestamp = 0;
+
+    int64_t drogue_backup_trigger_timestamp = 0;
+    int64_t main_backup_trigger_timestamp = 0;
 
     size_t idx = 0;
     for (int i = 0; i < times || endless; i++) {
@@ -143,10 +149,14 @@ void FlightComputer::process(uint32_t times, bool endless) {
             ) && !drogue_triggered;
 
         if (drogue_trigger) {
-            esp_err_t err = gpio_set_level(DROGUE_CHUTE, 1);
+            if (!BACKUP) {
+                esp_err_t err = gpio_set_level(DROGUE_CHUTE, 1);
             
-            if (err == ESP_OK && gpio_get_level(DROGUE_CONT) == 0) {
-                drogue_triggered = true;
+                if (err == ESP_OK && gpio_get_level(DROGUE_CONT) == 0) {
+                    drogue_triggered = true;
+                }
+            } else {
+                drogue_backup_trigger_timestamp = time_ms;
             }
         }
 
@@ -157,6 +167,30 @@ void FlightComputer::process(uint32_t times, bool endless) {
                 || (!BARO_AGREE_MAIN && (baro1_main_trigger_yes || baro2_main_trigger_yes));
 
             if (main_trigger) {
+                if (!BACKUP) {
+                    esp_err_t err = gpio_set_level(MAIN_CHUTE, 1);
+            
+                    if (err == ESP_OK && gpio_get_level(MAIN_CONT) == 0) {
+                        main_triggered = true;
+                    }
+                } else {
+                    main_backup_trigger_timestamp = time_ms;
+                }
+            }
+        }
+
+        if (BACKUP) {
+            if (!drogue_triggered && drogue_backup_trigger_timestamp != 0 && time_ms - drogue_backup_trigger_timestamp > BACKUP_DELAY) {
+                // duplicated code, refactor!
+                esp_err_t err = gpio_set_level(DROGUE_CHUTE, 1);
+            
+                if (err == ESP_OK && gpio_get_level(DROGUE_CONT) == 0) {
+                    drogue_triggered = true;
+                }
+            }
+
+            else if (!main_triggered && main_backup_trigger_timestamp != 0 && time_ms - main_backup_trigger_timestamp > BACKUP_DELAY) {
+                // duplicated code, refactor!
                 esp_err_t err = gpio_set_level(MAIN_CHUTE, 1);
             
                 if (err == ESP_OK && gpio_get_level(MAIN_CONT) == 0) {
