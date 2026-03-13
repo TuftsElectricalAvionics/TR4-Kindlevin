@@ -51,10 +51,18 @@ Expected<std::monostate> FlightComputer::init() {
     return this->sd.create_file(this->filename, (uint8_t *)data, sizeof(data)-1); // subtract one
 }
 
+// same NOAA pressure-altitude calculation the rrc3 does
+float FlightComputer::pressure_to_altitude(float pressure) {
+    float pres_mb = pressure / 100;
+    float h_alt = 145366.45 * (1 - powf(pres_mb / 1013.25, 0.190284));
+    return h_alt;
+}
+
 const float APOGEE_WINDOW = 1.0; // apogee detection window, ~ time the system will wait before deploy
-const bool BARO_AGREE = true; // do the barometers have to agree we've reached apogee before deploying?
+const bool BARO_AGREE_DROGUE = true; // do the barometers have to agree we've reached apogee before deploying?
+const bool BARO_AGREE_MAIN = false; // do the barometers have to agree we're below main altitude?
 
-
+const float MAIN_ALTITUDE = 500; // feet
 
 const size_t LOOPS_BEFORE_FLUSH = 100;
 char buffer[LOOPS_BEFORE_FLUSH * (40 + 14 * 20 + 13 + 1 + 1)];
@@ -66,6 +74,7 @@ void FlightComputer::process(uint32_t times, bool endless) {
     memset(buffer, 'X', sizeof(buffer));
 
     bool drogue_triggered = false;
+    bool main_triggered = false;
     float min_baro1_pres = INFINITY;
     int64_t baro1_timestamp = 0;
     float min_baro2_pres = INFINITY;
@@ -129,8 +138,8 @@ void FlightComputer::process(uint32_t times, bool endless) {
         bool baro1_drogue_trigger_yes = (time_ms - baro1_timestamp >= APOGEE_WINDOW) && (min_baro1_pres < baro_1_data.pressure); 
         bool baro2_drogue_trigger_yes = (time_ms - baro2_timestamp >= APOGEE_WINDOW) && (min_baro2_pres < baro_2_data.pressure); 
 
-        bool drogue_trigger = ((BARO_AGREE && baro1_drogue_trigger_yes && baro2_drogue_trigger_yes) 
-                || (!BARO_AGREE && (baro1_drogue_trigger_yes || baro2_drogue_trigger_yes))
+        bool drogue_trigger = ((BARO_AGREE_DROGUE && baro1_drogue_trigger_yes && baro2_drogue_trigger_yes) 
+                || (!BARO_AGREE_DROGUE && (baro1_drogue_trigger_yes || baro2_drogue_trigger_yes))
             ) && !drogue_triggered;
 
         if (drogue_trigger) {
@@ -141,10 +150,20 @@ void FlightComputer::process(uint32_t times, bool endless) {
             }
         }
 
-        // TODO:
-        // barometric equation!
-        // main deploy below set altitude
-        // make sure to check that drogue has already deployed!
+        if (drogue_triggered && !main_triggered) {
+            bool baro1_main_trigger_yes = FlightComputer::pressure_to_altitude(baro_1_data.pressure) < MAIN_ALTITUDE;
+            bool baro2_main_trigger_yes = FlightComputer::pressure_to_altitude(baro_2_data.pressure) < MAIN_ALTITUDE;
+            bool main_trigger = (BARO_AGREE_DROGUE && baro1_main_trigger_yes && baro2_main_trigger_yes) 
+                || (!BARO_AGREE_MAIN && (baro1_main_trigger_yes || baro2_main_trigger_yes));
+
+            if (main_trigger) {
+                esp_err_t err = gpio_set_level(MAIN_CHUTE, 1);
+            
+                if (err == ESP_OK && gpio_get_level(MAIN_CONT) == 0) {
+                    main_triggered = true;
+                }
+            }
+        }
 
        
         idx += snprintf(&buffer[idx], 40 + 20 * 14 + 14, "%lld,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",

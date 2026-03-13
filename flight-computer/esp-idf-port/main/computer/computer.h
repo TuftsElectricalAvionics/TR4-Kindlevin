@@ -23,7 +23,7 @@ namespace seds {
     private:
         static constexpr size_t buf_len = MOUNT_POINT_LEN + 1 + 3 + 4 + 4 + 1;
 
-        float pressure_to_altitude(float pressure);
+        static float pressure_to_altitude(float pressure);
     public:
         BMP581 baro1;
         BMP581 baro2;
