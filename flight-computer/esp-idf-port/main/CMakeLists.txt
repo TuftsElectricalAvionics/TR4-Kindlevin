@@ -6,5 +6,5 @@ idf_component_register(SRCS "computer/computer.cpp" "sd.cpp" "main.cpp"
         "i2c/BMP581.cpp"
         "i2c/BMI323.cpp"
         "i2c/MLX90395.cpp"
-        PRIV_REQUIRES spi_flash esp_driver_i2c esp_timer fatfs sdmmc esp_driver_sdspi
+        PRIV_REQUIRES spi_flash esp_driver_i2c esp_timer fatfs sdmmc esp_driver_sdspi esp_driver_gpio
         INCLUDE_DIRS ".")

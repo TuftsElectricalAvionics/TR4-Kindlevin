@@ -2,6 +2,7 @@
 
 #include <expected>
 
+#include "driver/gpio.h"
 #include "esp_err.h"
 #include "errors.h"
 #include "esp_log.h"
@@ -21,6 +22,8 @@ namespace seds {
     class FlightComputer {
     private:
         static constexpr size_t buf_len = MOUNT_POINT_LEN + 1 + 3 + 4 + 4 + 1;
+
+        float pressure_to_altitude(float pressure);
     public:
         BMP581 baro1;
         BMP581 baro2;

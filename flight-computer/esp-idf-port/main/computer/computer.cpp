@@ -1,9 +1,11 @@
 #include "computer.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include "driver/gpio.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -13,7 +15,17 @@ static const char *TAG = "computer";
 
 namespace seds {
 
+const gpio_num_t MAIN_CONT = GPIO_NUM_18;
+const gpio_num_t DROGUE_CONT = GPIO_NUM_19;
+const gpio_num_t DROGUE_CHUTE = GPIO_NUM_22;
+const gpio_num_t MAIN_CHUTE = GPIO_NUM_23;
+
 Expected<std::monostate> FlightComputer::init() {
+    ESP_TRY(gpio_set_direction(DROGUE_CONT, GPIO_MODE_INPUT));
+    ESP_TRY(gpio_set_direction(MAIN_CONT, GPIO_MODE_INPUT));
+    ESP_TRY(gpio_set_direction(DROGUE_CHUTE, GPIO_MODE_OUTPUT));
+    ESP_TRY(gpio_set_direction(MAIN_CHUTE, GPIO_MODE_OUTPUT));
+
     char data[] = "timestamp, accel x, accel y, accel z, degrees x, degrees y, degrees z, baro 1 temp, baro 1 pressure, baro 2 temp, baro 2 pressure, high g accel x, high g accel y, high g accel z, temp\n";
     // test different filenames
     bool broke = false;
@@ -39,7 +51,12 @@ Expected<std::monostate> FlightComputer::init() {
     return this->sd.create_file(this->filename, (uint8_t *)data, sizeof(data)-1); // subtract one
 }
 
-constexpr size_t LOOPS_BEFORE_FLUSH = 100;
+const float APOGEE_WINDOW = 1.0; // apogee detection window, ~ time the system will wait before deploy
+const bool BARO_AGREE = true; // do the barometers have to agree we've reached apogee before deploying?
+
+
+
+const size_t LOOPS_BEFORE_FLUSH = 100;
 char buffer[LOOPS_BEFORE_FLUSH * (40 + 14 * 20 + 13 + 1 + 1)];
 
 void FlightComputer::process(uint32_t times, bool endless) {
@@ -47,6 +64,13 @@ void FlightComputer::process(uint32_t times, bool endless) {
 
     struct timeval tv_now;
     memset(buffer, 'X', sizeof(buffer));
+
+    bool drogue_triggered = false;
+    float min_baro1_pres = INFINITY;
+    int64_t baro1_timestamp = 0;
+    float min_baro2_pres = INFINITY;
+    int64_t baro2_timestamp = 0;
+
     size_t idx = 0;
     for (int i = 0; i < times || endless; i++) {
         gettimeofday(&tv_now, NULL);
@@ -67,6 +91,10 @@ void FlightComputer::process(uint32_t times, bool endless) {
         auto baro_1_data_try = this->baro1.read_data();
         if (baro_1_data_try.has_value()) {
             baro_1_data = baro_1_data_try.value();
+            if (min_baro1_pres >= baro_1_data.pressure) {
+                min_baro1_pres = baro_1_data.pressure;
+                baro1_timestamp = time_ms;
+            }
         } else {
             ESP_LOGE(TAG, "baro 1 data read failed");
         }
@@ -74,6 +102,10 @@ void FlightComputer::process(uint32_t times, bool endless) {
         auto baro_2_data_try = this->baro2.read_data();
         if (baro_2_data_try.has_value()) {
             baro_2_data = baro_2_data_try.value();
+            if (min_baro2_pres >= baro_2_data.pressure) {
+                min_baro2_pres = baro_2_data.pressure;
+                baro2_timestamp = time_ms;
+            }
         } else {
             ESP_LOGE(TAG, "baro 2 data read failed");
         }
@@ -91,6 +123,29 @@ void FlightComputer::process(uint32_t times, bool endless) {
         } else {
             ESP_LOGE(TAG, "temp data read failed");
         } 
+
+        // barometer data processing
+        // don't mix data across barometers to mitigate barometer errors
+        bool baro1_drogue_trigger_yes = (time_ms - baro1_timestamp >= APOGEE_WINDOW) && (min_baro1_pres < baro_1_data.pressure); 
+        bool baro2_drogue_trigger_yes = (time_ms - baro2_timestamp >= APOGEE_WINDOW) && (min_baro2_pres < baro_2_data.pressure); 
+
+        bool drogue_trigger = ((BARO_AGREE && baro1_drogue_trigger_yes && baro2_drogue_trigger_yes) 
+                || (!BARO_AGREE && (baro1_drogue_trigger_yes || baro2_drogue_trigger_yes))
+            ) && !drogue_triggered;
+
+        if (drogue_trigger) {
+            esp_err_t err = gpio_set_level(DROGUE_CHUTE, 1);
+            
+            if (err == ESP_OK && gpio_get_level(DROGUE_CONT) == 0) {
+                drogue_triggered = true;
+            }
+        }
+
+        // TODO:
+        // barometric equation!
+        // main deploy below set altitude
+        // make sure to check that drogue has already deployed!
+
        
         idx += snprintf(&buffer[idx], 40 + 20 * 14 + 14, "%lld,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
             time_ms,
@@ -101,27 +156,27 @@ void FlightComputer::process(uint32_t times, bool endless) {
         
         // speed this up!s
         if ((i % LOOPS_BEFORE_FLUSH) == LOOPS_BEFORE_FLUSH - 1) {
-            ESP_LOGI(TAG, "Flushing");
+            ESP_LOGI(TAG, "Flushing (not really)");
             errno = 0;
             //fwrite((void *)buffer, 1, idx, data_file);
             if (errno != 0) {
                 ESP_LOGE(TAG, "err: %s", strerror(errno));
             }
             errno = 0;
-            fflush(data_file);
+            //fflush(data_file);
             if (errno != 0) {
                 ESP_LOGE(TAG, "err: %s", strerror(errno));
             }
             errno = 0;
-            fsync(fileno(data_file));
+            //fsync(fileno(data_file));
             if (errno != 0) {
                 ESP_LOGE(TAG, "err: %s", strerror(errno));
             }
             
-            auto append_res = sd.append_file(FlightComputer::filename, (uint8_t *)buffer, idx);
-            if (!append_res.has_value()) {
-                ESP_LOGE(TAG, "flight computer append error: %s", append_res.error()->what());
-            }
+            //auto append_res = sd.append_file(FlightComputer::filename, (uint8_t *)buffer, idx);
+            //if (!append_res.has_value()) {
+            //    ESP_LOGE(TAG, "flight computer append error: %s", append_res.error()->what());
+            //}
 
             memset(buffer, 'X', sizeof(buffer));
             idx = 0;
