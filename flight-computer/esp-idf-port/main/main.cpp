@@ -22,6 +22,19 @@ using namespace seds::errors;
 
 extern "C" void app_main()
 {
+    gpio_reset_pin(seds::DROGUE_CONT);
+    gpio_reset_pin(seds::MAIN_CONT);
+    gpio_reset_pin(seds::DROGUE_CHUTE);
+    gpio_reset_pin(seds::MAIN_CHUTE);
+    
+    gpio_set_direction(seds::DROGUE_CONT, GPIO_MODE_INPUT);
+    gpio_set_direction(seds::MAIN_CONT, GPIO_MODE_INPUT);
+    gpio_set_direction(seds::DROGUE_CHUTE, GPIO_MODE_OUTPUT);
+    gpio_set_direction(seds::MAIN_CHUTE, GPIO_MODE_OUTPUT);
+
+    gpio_set_level(seds::DROGUE_CHUTE, 0);
+    gpio_set_level(seds::MAIN_CHUTE, 0);
+
     ESP_LOGI(TAG, "Hello!");
 
     auto i2c = seds::I2C::create();

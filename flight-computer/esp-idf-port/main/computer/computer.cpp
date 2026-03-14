@@ -15,17 +15,7 @@ static const char *TAG = "computer";
 
 namespace seds {
 
-const gpio_num_t MAIN_CONT = GPIO_NUM_18;
-const gpio_num_t DROGUE_CONT = GPIO_NUM_19;
-const gpio_num_t DROGUE_CHUTE = GPIO_NUM_22;
-const gpio_num_t MAIN_CHUTE = GPIO_NUM_23;
-
 Expected<std::monostate> FlightComputer::init() {
-    ESP_TRY(gpio_set_direction(DROGUE_CONT, GPIO_MODE_INPUT));
-    ESP_TRY(gpio_set_direction(MAIN_CONT, GPIO_MODE_INPUT));
-    ESP_TRY(gpio_set_direction(DROGUE_CHUTE, GPIO_MODE_OUTPUT));
-    ESP_TRY(gpio_set_direction(MAIN_CHUTE, GPIO_MODE_OUTPUT));
-
     char data[] = "timestamp, accel x, accel y, accel z, degrees x, degrees y, degrees z, baro 1 temp, baro 1 pressure, baro 2 temp, baro 2 pressure, high g accel x, high g accel y, high g accel z, temp\n";
     // test different filenames
     bool broke = false;
@@ -58,7 +48,7 @@ float FlightComputer::pressure_to_altitude(float pressure) {
     return h_alt;
 }
 
-const int64_t APOGEE_WINDOW = 500; // apogee detection window, ~ ms the system will wait before deploy
+const int64_t APOGEE_WINDOW = 200; // apogee detection window, ~ ms the system will wait before deploy
 const bool BARO_AGREE_DROGUE = true; // do the barometers have to agree we've reached apogee before deploying?
 const bool BARO_AGREE_MAIN = false; // do the barometers have to agree we're below main altitude?
 
@@ -67,7 +57,7 @@ const float MAIN_ALTITUDE = 500; // feet
 const bool BACKUP = false;
 const int64_t BACKUP_DELAY = 1000; // ms
 
-const size_t LOOPS_BEFORE_FLUSH = 100;
+const size_t LOOPS_BEFORE_FLUSH = 10;
 char buffer[LOOPS_BEFORE_FLUSH * (40 + 14 * 20 + 13 + 1 + 1)];
 
 void FlightComputer::process(uint32_t times, bool endless) {
@@ -85,6 +75,11 @@ void FlightComputer::process(uint32_t times, bool endless) {
 
     int64_t drogue_backup_trigger_timestamp = 0;
     int64_t main_backup_trigger_timestamp = 0;
+
+    float main_deploy_b1_pressure = 0;
+    float main_deploy_b2_pressure = 0;
+
+    bool data_written = false;
 
     size_t idx = 0;
     for (int i = 0; i < times || endless; i++) {
@@ -144,9 +139,12 @@ void FlightComputer::process(uint32_t times, bool endless) {
         bool baro1_drogue_trigger_yes = (time_ms - baro1_timestamp >= APOGEE_WINDOW) && (min_baro1_pres < baro_1_data.pressure); 
         bool baro2_drogue_trigger_yes = (time_ms - baro2_timestamp >= APOGEE_WINDOW) && (min_baro2_pres < baro_2_data.pressure); 
 
+        /*
         bool drogue_trigger = ((BARO_AGREE_DROGUE && baro1_drogue_trigger_yes && baro2_drogue_trigger_yes) 
                 || (!BARO_AGREE_DROGUE && (baro1_drogue_trigger_yes || baro2_drogue_trigger_yes))
             ) && !drogue_triggered;
+        */
+       bool drogue_trigger = baro1_drogue_trigger_yes && !drogue_triggered;
 
         if (drogue_trigger) {
             if (!BACKUP) {
@@ -154,6 +152,8 @@ void FlightComputer::process(uint32_t times, bool endless) {
             
                 if (err == ESP_OK && gpio_get_level(DROGUE_CONT) == 0) {
                     drogue_triggered = true;
+
+                    drogue_backup_trigger_timestamp = time_ms;
                 }
             } else {
                 drogue_backup_trigger_timestamp = time_ms;
@@ -163,8 +163,11 @@ void FlightComputer::process(uint32_t times, bool endless) {
         if (drogue_triggered && !main_triggered) {
             bool baro1_main_trigger_yes = FlightComputer::pressure_to_altitude(baro_1_data.pressure) < MAIN_ALTITUDE;
             bool baro2_main_trigger_yes = FlightComputer::pressure_to_altitude(baro_2_data.pressure) < MAIN_ALTITUDE;
-            bool main_trigger = (BARO_AGREE_DROGUE && baro1_main_trigger_yes && baro2_main_trigger_yes) 
-                || (!BARO_AGREE_MAIN && (baro1_main_trigger_yes || baro2_main_trigger_yes));
+            /*
+            bool main_trigger = ((BARO_AGREE_DROGUE && baro1_main_trigger_yes && baro2_main_trigger_yes) 
+                || (!BARO_AGREE_MAIN && (baro1_main_trigger_yes || baro2_main_trigger_yes)))
+            */
+            bool main_trigger = baro1_main_trigger_yes;
 
             if (main_trigger) {
                 if (!BACKUP) {
@@ -172,6 +175,10 @@ void FlightComputer::process(uint32_t times, bool endless) {
             
                     if (err == ESP_OK && gpio_get_level(MAIN_CONT) == 0) {
                         main_triggered = true;
+                        main_deploy_b1_pressure = baro_1_data.pressure;
+                        main_deploy_b2_pressure = baro_2_data.pressure;
+
+                        main_backup_trigger_timestamp = time_ms;
                     }
                 } else {
                     main_backup_trigger_timestamp = time_ms;
@@ -195,18 +202,21 @@ void FlightComputer::process(uint32_t times, bool endless) {
             
                 if (err == ESP_OK && gpio_get_level(MAIN_CONT) == 0) {
                     main_triggered = true;
+                    main_deploy_b1_pressure = baro_1_data.pressure;
+                    main_deploy_b2_pressure = baro_2_data.pressure; 
                 }
             }
         }
 
-       
+        /*
         idx += snprintf(&buffer[idx], 40 + 20 * 14 + 14, "%lld,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
             time_ms,
             imu_data.ax, imu_data.ay, imu_data.az, imu_data.gx, imu_data.gy, imu_data.gz,
             baro_1_data.baro_temp, baro_1_data.pressure, baro_2_data.baro_temp, baro_2_data.pressure,
             high_g_data.h_ax, high_g_data.h_ay, high_g_data.h_az, tmp
         );
-        
+        */
+
         // speed this up!s
         if ((i % LOOPS_BEFORE_FLUSH) == LOOPS_BEFORE_FLUSH - 1) {
             ESP_LOGI(TAG, "Flushing (not really)");
@@ -230,6 +240,18 @@ void FlightComputer::process(uint32_t times, bool endless) {
             //if (!append_res.has_value()) {
             //    ESP_LOGE(TAG, "flight computer append error: %s", append_res.error()->what());
             //}
+
+            if (drogue_triggered && main_triggered && !data_written) {
+                idx = 0;
+                idx += snprintf(&buffer[idx], 1000, "time: %lld, min b1 pressure: %f, ts: %lld, min b2 pressure: %f, ts: %lld, main deploy b1 pressure: %f, main deploy b2 pressure: %f, drogue deployed: %lld, main deployed: %lld\n", 
+                    time_ms, min_baro1_pres, baro1_timestamp, min_baro2_pres, baro2_timestamp, main_deploy_b1_pressure, main_deploy_b2_pressure, drogue_backup_trigger_timestamp, main_backup_trigger_timestamp 
+                );
+                fwrite((void *)buffer, 1, idx, data_file);
+                fflush(data_file);
+                fsync(fileno(data_file));
+
+                data_written = true;
+            }           
 
             memset(buffer, 'X', sizeof(buffer));
             idx = 0;

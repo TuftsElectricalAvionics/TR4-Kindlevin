@@ -19,6 +19,12 @@
 namespace seds {
     using namespace seds::errors;
 
+    const gpio_num_t MAIN_CONT = GPIO_NUM_18;
+    const gpio_num_t DROGUE_CONT = GPIO_NUM_19;
+    const gpio_num_t PIEZO = GPIO_NUM_21;
+    const gpio_num_t DROGUE_CHUTE = GPIO_NUM_22;
+    const gpio_num_t MAIN_CHUTE = GPIO_NUM_23;
+
     class FlightComputer {
     private:
         static constexpr size_t buf_len = MOUNT_POINT_LEN + 1 + 3 + 4 + 4 + 1;
