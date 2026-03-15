@@ -47,54 +47,42 @@ Expected<SDCard> SDCard::create() {
     return SDCard();
 }
 
-struct log_args {
+struct log_args_inner {
     FILE* file;
-    uint8_t* buffer;
-    std::atomic<size_t> *max_idx;
-    std::atomic<size_t> *insert_idx;
-    size_t min_size;
-    std::atomic<bool> *sd_sem;
-    std::atomic<bool> *write_sem;
+    struct log_args args;
 };
 
-// pulled out to function to make code clearer
-// shouldn't be slow since it's one line and we tell c++ to inline
-// maybe optimize this to avoid branches? probably doesn't matter though
-inline size_t wrap_around_diff(int32_t x, int32_t y, int32_t modulus) {
-    if (x > y) {
-        return (size_t)(x - y);
-    }
-    return (size_t)(x + modulus - y); 
-}
-
 void logging_task(void *arg_ptr) {
-    struct log_args args = *(struct log_args *)arg_ptr;
-    size_t remove_idx = 0;
+    struct log_args_inner args_in = *(struct log_args_inner *)arg_ptr;
+    FILE* file = args_in.file;
+    struct log_args args = args_in.args;
+
+    size_t remove_idxs[2] = {0, 0};
     struct timeval tv_now;
     while (true) {
         if (!args.sd_sem->load(std::memory_order_seq_cst)) {
             args.write_sem->store(true, std::memory_order_seq_cst);
+            // write to other buffer
+            size_t which = (args.which_buffer->load(std::memory_order_relaxed) + 1) % 2;
+
             gettimeofday(&tv_now, NULL);
             int64_t time_ms = (int64_t)tv_now.tv_sec * 1000L + (int64_t)tv_now.tv_usec / 1000L;
 
-            size_t insert_idx = args.insert_idx->load(std::memory_order_relaxed); // prevent changing out from under us
-            size_t max_idx = args.max_idx->load(std::memory_order_relaxed);
-            if (wrap_around_diff((int32_t)insert_idx, (int32_t)remove_idx, (int32_t)max_idx) < args.min_size) { continue; }
-            // todo - have specific name for tag?
-            if (insert_idx > remove_idx) {
-                ESP_LOGI("sd_log_task", "%lld: %.*s", time_ms, insert_idx - remove_idx, &args.buffer[remove_idx]);
-
-                fwrite(&args.buffer[remove_idx], 1, insert_idx - remove_idx, args.file);
-            } else if (insert_idx < remove_idx) {
-                // log in two parts
-                ESP_LOGI("sd_log_task", "%lld: %.*s", time_ms, max_idx - remove_idx, &args.buffer[remove_idx]);
-                fwrite(&args.buffer[remove_idx], 1, max_idx - remove_idx, args.file);
-                ESP_LOGI("sd_log_task", "%lld: %.*s", time_ms, insert_idx, &args.buffer[0]);
-                fwrite(&args.buffer[0], 1, insert_idx, args.file);
+            size_t insert_idx = args.insert_idxs[which].load(std::memory_order_relaxed); // prevent changing out from under us
+            if (insert_idx < remove_idxs[which]) {
+                remove_idxs[which] = 0;
             }
-            fflush(args.file);
-            fsync(fileno(args.file));
-            remove_idx = insert_idx;
+            if (insert_idx > remove_idxs[which]) { 
+                size_t write_size = std::min(insert_idx - remove_idxs[which], args.write_size);
+                ESP_LOGI("sd_log_task", "%lld: which: %zu, idx: %zu", time_ms, which, remove_idxs[which]);
+                ESP_LOGI("sd_log_task", "%.*s", write_size, &args.buffers[which][remove_idxs[which]]);
+
+                fwrite(&args.buffers[which][remove_idxs[which]], 1, write_size, file);
+
+                fflush(file);
+                fsync(fileno(file));
+                remove_idxs[which] += write_size;
+            }
             args.write_sem->store(false, std::memory_order_seq_cst);
        } else {
             args.write_sem->store(false, std::memory_order_seq_cst);
@@ -102,9 +90,9 @@ void logging_task(void *arg_ptr) {
     }
 }
 
-Expected<TaskHandle_t> SDCard::create_log_task(const char* path, uint8_t* buffer, std::atomic<size_t> *max_idx, std::atomic<size_t> *insert_idx, size_t min_size, std::atomic<bool> *sd_sem, std::atomic<bool> *write_sem) {
+Expected<TaskHandle_t> SDCard::create_log_task(struct log_args call_args) {
     errno = 0;
-    FILE *f = fopen(path, "a");
+    FILE *f = fopen(call_args.path, "a");
     if (f == NULL) {
         // save error
         auto error = errno;
@@ -133,15 +121,10 @@ Expected<TaskHandle_t> SDCard::create_log_task(const char* path, uint8_t* buffer
 
     // must be created on heap
     // could be statically allocated somewhere, but I don't think that's necessary
-    struct log_args *args = (struct log_args*)malloc(sizeof(log_args));
+    struct log_args_inner *args = (struct log_args_inner*)malloc(sizeof(log_args_inner));
 
     args->file = f;
-    args->buffer = buffer;
-    args->max_idx = max_idx;
-    args->insert_idx = insert_idx;
-    args->min_size = min_size;
-    args->sd_sem = sd_sem;
-    args->write_sem = write_sem;
+    args->args = call_args;
 
     // Force this task on the other core
     // TODO: give option to specify core?

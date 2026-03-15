@@ -40,18 +40,20 @@ Expected<std::monostate> FlightComputer::init() {
     return this->sd.create_file(this->filename, (uint8_t *)data, sizeof(data)-1); // subtract one
 }
 
-constexpr size_t LOOPS_BEFORE_FLUSH = 100;
-constexpr size_t BUF_LEN = LOOPS_BEFORE_FLUSH * (40 + 14 * 20 + 13 + 1 + 1);
-char buffer[BUF_LEN];
+constexpr size_t LOOPS_BEFORE_FLUSH = 25;
+const size_t MAX_BLOCK_SIZE = (40 + 14 * 20 + 13 + 1 + 1);
+constexpr size_t BUF_LEN = LOOPS_BEFORE_FLUSH * MAX_BLOCK_SIZE;
+char buffers[2][BUF_LEN];
 
 void FlightComputer::process(uint32_t times, bool endless) {
     std::atomic<bool> sd_req = {false};
     std::atomic<bool> writing = {false};
 
     struct timeval tv_now;
-    memset(buffer, 'X', sizeof(buffer));
-    std::atomic<size_t> idx = {0};
-    std::atomic<size_t> max_idx = {BUF_LEN};
+    memset(buffers[0], 'X', sizeof(buffers[0]));
+    memset(buffers[1], 'X', sizeof(buffers[1]));
+    std::atomic<size_t> idxs[2] = {{0}, {0}};
+    std::atomic<size_t> which_buf = {0};
 
     char data[] = "timestamp, accel x, accel y, accel z, degrees x, degrees y, degrees z, baro 1 temp, baro 1 pressure, baro 2 temp, baro 2 pressure, high g accel x, high g accel y, high g accel z, temp\n";
     auto err = this->sd.create_file(MOUNT_POINT"/test1.csv", (uint8_t *)data, sizeof(data)-1);
@@ -69,7 +71,16 @@ void FlightComputer::process(uint32_t times, bool endless) {
 
     // spawn other task
     // change back to this->filename once we're done testing!
-    TaskHandle_t handle = unwrap(this->sd.create_log_task(this->filename, (uint8_t *)buffer, &max_idx, &idx, 1000, &sd_req, &writing));
+    struct log_args args = {
+        .path = this->filename,
+        .buffers = {(uint8_t*)buffers[0], (uint8_t*)buffers[1]},
+        .insert_idxs = idxs,
+        .which_buffer = &which_buf,
+        .write_size = 1000,
+        .sd_sem = &sd_req,
+        .write_sem = &writing
+    };
+    TaskHandle_t handle = unwrap(this->sd.create_log_task(args));
 
     for (int i = 0; i < times || endless; i++) {
         gettimeofday(&tv_now, NULL);
@@ -114,20 +125,23 @@ void FlightComputer::process(uint32_t times, bool endless) {
         } else {
             ESP_LOGE(TAG, "temp data read failed");
         } 
-       
-        size_t inc = snprintf(&buffer[idx], 40 + 20 * 14 + 14, "%lld,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
+        
+        auto idx = &idxs[which_buf.load(std::memory_order_relaxed)];
+
+        size_t inc = snprintf(&buffers[which_buf.load(std::memory_order_relaxed)][idx->load(std::memory_order_relaxed)], MAX_BLOCK_SIZE, "%lld,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
             time_ms,
             imu_data.ax, imu_data.ay, imu_data.az, imu_data.gx, imu_data.gy, imu_data.gz,
             baro_1_data.baro_temp, baro_1_data.pressure, baro_2_data.baro_temp, baro_2_data.pressure,
             high_g_data.h_ax, high_g_data.h_ay, high_g_data.h_az, tmp
         );
-        ESP_LOGI(TAG, "%lld: %.*s", time_ms, inc, &buffer[idx]);
-
-        idx.fetch_add(inc, std::memory_order_acq_rel);
-
-        // speed this up
+        ESP_LOGI(TAG, "%lld: which: %zu, idx: %zu,  %.*s", 
+            time_ms, which_buf.load(std::memory_order_relaxed), idx->load(std::memory_order_relaxed),
+            inc, &buffers[which_buf.load(std::memory_order_relaxed)][idx->load(std::memory_order_relaxed)] );
         
-        if ((i % LOOPS_BEFORE_FLUSH) == LOOPS_BEFORE_FLUSH - 1) {
+        idx->fetch_add(inc, std::memory_order_acq_rel);
+        
+        // no room left
+        if (BUF_LEN - idx->load(std::memory_order_relaxed) <= MAX_BLOCK_SIZE) {
             ESP_LOGI(TAG, "FLUSHING");
             ESP_LOGI(TAG, "SUSPENDING OTHER TASK");
 
@@ -147,9 +161,9 @@ void FlightComputer::process(uint32_t times, bool endless) {
             ESP_LOGI(TAG, "SUSPENDED OTHER TASK");
             
             errno = 0;
-            size_t write_idx = (size_t)idx.load(std::memory_order_seq_cst);
+            size_t write_idx = (size_t)idx->load(std::memory_order_seq_cst);
             ESP_LOGI(TAG, "Writing at idx %u", write_idx);
-            fwrite((void *)buffer, 1, write_idx, f);
+            fwrite((void *)buffers[which_buf.load(std::memory_order_relaxed)], 1, write_idx, f);
             if (errno != 0) {
                 ESP_LOGE(TAG, "err: %s", strerror(errno));
             }
@@ -166,9 +180,10 @@ void FlightComputer::process(uint32_t times, bool endless) {
 
             ESP_LOGI(TAG, "sd write successful");
 
-            //memset(buffer, 'X', sizeof(buffer));
-            max_idx.store(write_idx, std::memory_order_relaxed);
-            idx.store(0, std::memory_order_relaxed);
+            size_t next_which = (which_buf.load(std::memory_order_relaxed) + 1) % 2;
+            auto next_idx = &idxs[next_which];
+            next_idx->store(0, std::memory_order_seq_cst);
+            which_buf.store(next_which, std::memory_order_seq_cst);
 
             ESP_LOGI(TAG, "RESUMING OTHER TASK");
             sd_req.store(false, std::memory_order_seq_cst);
