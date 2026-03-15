@@ -46,6 +46,7 @@ char buffer[BUF_LEN];
 
 void FlightComputer::process(uint32_t times, bool endless) {
     std::atomic<bool> sd_req = {false};
+    std::atomic<bool> writing = {false};
 
     struct timeval tv_now;
     memset(buffer, 'X', sizeof(buffer));
@@ -68,7 +69,7 @@ void FlightComputer::process(uint32_t times, bool endless) {
 
     // spawn other task
     // change back to this->filename once we're done testing!
-    TaskHandle_t handle = unwrap(this->sd.create_log_task(this->filename, (uint8_t *)buffer, &max_idx, &idx, 1000, &sd_req));
+    TaskHandle_t handle = unwrap(this->sd.create_log_task(this->filename, (uint8_t *)buffer, &max_idx, &idx, 1000, &sd_req, &writing));
 
     for (int i = 0; i < times || endless; i++) {
         gettimeofday(&tv_now, NULL);
@@ -134,7 +135,10 @@ void FlightComputer::process(uint32_t times, bool endless) {
             //while (xSemaphoreTake(sd_semaphore, pdMS_TO_TICKS(30)) != pdTRUE) {}
 
             sd_req.store(true, std::memory_order_seq_cst);
-            vTaskDelay(pdMS_TO_TICKS(1000));
+            while(writing.load(std::memory_order_seq_cst)) {
+                // spin
+                vTaskDelay(pdMS_TO_TICKS(10));
+            };
 
 
             ESP_LOGI(TAG, "AQCUIRED SEMAPHORE!");
@@ -161,7 +165,6 @@ void FlightComputer::process(uint32_t times, bool endless) {
             }
 
             ESP_LOGI(TAG, "sd write successful");
-            vTaskDelay(pdMS_TO_TICKS(2000));
 
             //memset(buffer, 'X', sizeof(buffer));
             max_idx.store(write_idx, std::memory_order_relaxed);

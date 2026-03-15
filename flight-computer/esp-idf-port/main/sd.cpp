@@ -54,6 +54,7 @@ struct log_args {
     std::atomic<size_t> *insert_idx;
     size_t min_size;
     std::atomic<bool> *sd_sem;
+    std::atomic<bool> *write_sem;
 };
 
 // pulled out to function to make code clearer
@@ -72,6 +73,7 @@ void logging_task(void *arg_ptr) {
     struct timeval tv_now;
     while (true) {
         if (!args.sd_sem->load(std::memory_order_seq_cst)) {
+            args.write_sem->store(true, std::memory_order_seq_cst);
             gettimeofday(&tv_now, NULL);
             int64_t time_ms = (int64_t)tv_now.tv_sec * 1000L + (int64_t)tv_now.tv_usec / 1000L;
 
@@ -93,11 +95,14 @@ void logging_task(void *arg_ptr) {
             fflush(args.file);
             fsync(fileno(args.file));
             remove_idx = insert_idx;
+            args.write_sem->store(false, std::memory_order_seq_cst);
+       } else {
+            args.write_sem->store(false, std::memory_order_seq_cst);
        }
     }
 }
 
-Expected<TaskHandle_t> SDCard::create_log_task(const char* path, uint8_t* buffer, std::atomic<size_t> *max_idx, std::atomic<size_t> *insert_idx, size_t min_size, std::atomic<bool> *sd_sem) {
+Expected<TaskHandle_t> SDCard::create_log_task(const char* path, uint8_t* buffer, std::atomic<size_t> *max_idx, std::atomic<size_t> *insert_idx, size_t min_size, std::atomic<bool> *sd_sem, std::atomic<bool> *write_sem) {
     errno = 0;
     FILE *f = fopen(path, "a");
     if (f == NULL) {
@@ -136,6 +141,7 @@ Expected<TaskHandle_t> SDCard::create_log_task(const char* path, uint8_t* buffer
     args->insert_idx = insert_idx;
     args->min_size = min_size;
     args->sd_sem = sd_sem;
+    args->write_sem = write_sem;
 
     // Force this task on the other core
     // TODO: give option to specify core?
