@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -40,16 +41,20 @@ Expected<std::monostate> FlightComputer::init() {
     return this->sd.create_file(this->filename, (uint8_t *)data, sizeof(data)-1); // subtract one
 }
 
-constexpr size_t LOOPS_BEFORE_FLUSH = 25;
+constexpr size_t LOOPS_BEFORE_FLUSH = 75;
 const size_t MAX_BLOCK_SIZE = (40 + 14 * 20 + 13 + 1 + 1);
-constexpr size_t BUF_LEN = LOOPS_BEFORE_FLUSH * MAX_BLOCK_SIZE;
-char buffers[2][BUF_LEN];
+constexpr size_t BUF_LEN = LOOPS_BEFORE_FLUSH * MAX_BLOCK_SIZE; //chunk_bytes; 
+static_assert(BUF_LEN >= LOOPS_BEFORE_FLUSH * MAX_BLOCK_SIZE, "chunk bytes not enough to store specified buf size");
+char* buffers[2];
 
 void FlightComputer::process(uint32_t times, bool endless) {
     std::atomic<bool> sd_req = {false};
     std::atomic<bool> writing = {false};
 
     struct timeval tv_now;
+    buffers[0] = (char *)heap_caps_aligned_alloc(32, BUF_LEN, MALLOC_CAP_DMA);
+    buffers[1] = (char *)heap_caps_aligned_alloc(32, BUF_LEN, MALLOC_CAP_DMA);
+
     memset(buffers[0], 'X', sizeof(buffers[0]));
     memset(buffers[1], 'X', sizeof(buffers[1]));
     std::atomic<size_t> idxs[2] = {{0}, {0}};
@@ -76,7 +81,7 @@ void FlightComputer::process(uint32_t times, bool endless) {
         .buffers = {(uint8_t*)buffers[0], (uint8_t*)buffers[1]},
         .insert_idxs = idxs,
         .which_buffer = &which_buf,
-        .write_size = 1000,
+        .write_size = 5000,
         .sd_sem = &sd_req,
         .write_sem = &writing
     };
@@ -128,7 +133,8 @@ void FlightComputer::process(uint32_t times, bool endless) {
         
         auto idx = &idxs[which_buf.load(std::memory_order_relaxed)];
 
-        size_t inc = snprintf(&buffers[which_buf.load(std::memory_order_relaxed)][idx->load(std::memory_order_relaxed)], MAX_BLOCK_SIZE, "%lld,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
+        // newline in front ensures that even if we cutoff a line, we still keep the right division
+        size_t inc = snprintf(&buffers[which_buf.load(std::memory_order_relaxed)][idx->load(std::memory_order_relaxed)], MAX_BLOCK_SIZE, "\n%lld,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g",
             time_ms,
             imu_data.ax, imu_data.ay, imu_data.az, imu_data.gx, imu_data.gy, imu_data.gz,
             baro_1_data.baro_temp, baro_1_data.pressure, baro_2_data.baro_temp, baro_2_data.pressure,
@@ -142,6 +148,8 @@ void FlightComputer::process(uint32_t times, bool endless) {
         
         // no room left
         if (BUF_LEN - idx->load(std::memory_order_relaxed) <= MAX_BLOCK_SIZE) {
+
+
             ESP_LOGI(TAG, "FLUSHING");
             ESP_LOGI(TAG, "SUSPENDING OTHER TASK");
 
@@ -191,7 +199,7 @@ void FlightComputer::process(uint32_t times, bool endless) {
         }
 
         // allow printing task to overtake for now
-        vTaskDelay(pdMS_TO_TICKS(150));
+        //vTaskDelay(pdMS_TO_TICKS(150));
     }
 }
 

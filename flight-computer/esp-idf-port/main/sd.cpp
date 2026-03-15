@@ -2,8 +2,11 @@
 #include <string.h>
 
 #include "esp_log.h"
+#include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+
+static const char *TAG = "SD";
 
 esp_vfs_fat_sdmmc_mount_config_t mount_cfg;
 sdmmc_card_t *card;
@@ -11,19 +14,16 @@ const char mount_point[] = MOUNT_POINT;
 sdmmc_host_t host;
 spi_bus_config_t bus_cfg;
 sdspi_device_config_t slot_config;
+spi_host_device_t host_slot;
 
 namespace seds {
 
-Expected<SDCard> SDCard::create() {
-    mount_cfg = {
-        .format_if_mount_failed = false,//true,
-        .max_files = 5,//MAX_FILES,
-        .allocation_unit_size = 16 * 1024, // this needs to match whatever we format it with
-        .disk_status_check_enable = false,
-        .use_one_fat = false,
-    };
-    
+// making changes based on 
+// https://github.com/mdarveau/SD_BENCHMARK_V2/blob/main/src/main.c
+
+Expected<void> setup_spi_and_mount() {
     host = SDSPI_HOST_DEFAULT();
+    host_slot = (spi_host_device_t)host.slot;
 
     bus_cfg = {
         .mosi_io_num = PIN_NUM_MOSI,
@@ -31,18 +31,57 @@ Expected<SDCard> SDCard::create() {
         .sclk_io_num = PIN_NUM_CLK,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
-        .max_transfer_sz = 4000,
+        .max_transfer_sz = 128 * 1024,
+    };
+
+    // Ensure CS idles high prior to bus init
+    gpio_config_t cs_cfg = {
+        .pin_bit_mask = 1ULL << PIN_NUM_CS,
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&cs_cfg);
+    gpio_set_level(PIN_NUM_CS, 1);
+
+    ESP_TRY(spi_bus_initialize((spi_host_device_t)host.slot, &bus_cfg, SPI_DMA_CH_AUTO));
+    ESP_LOGI(TAG, "spi bus initialization successful");
+    // Allow shifters/power to settle before card init
+    vTaskDelay(pdMS_TO_TICKS(20));
+
+    mount_cfg = {
+        .format_if_mount_failed = false,//true,
+        .max_files = 5, //MAX_FILES,
+        .allocation_unit_size = 0,
+        .disk_status_check_enable = false,
+        .use_one_fat = false,
     };
     
-    ESP_TRY(spi_bus_initialize((spi_host_device_t)host.slot, &bus_cfg, SDSPI_DEFAULT_DMA));
-    ESP_LOGI("SD", "spi bus initialization successful");
+    
     slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
     slot_config.gpio_cs = PIN_NUM_CS;
     slot_config.host_id = (spi_host_device_t)host.slot;
 
     ESP_TRY(esp_vfs_fat_sdspi_mount(mount_point, &host, &slot_config, &mount_cfg, &card));
-    ESP_LOGI("SD", "fs mount successful");
+    ESP_LOGI(TAG, "fs mount successful");
     sdmmc_card_print_info(stdout, card);
+
+    return {};
+}
+
+Expected<SDCard> SDCard::create() {
+    TRY(setup_spi_and_mount());
+
+    // from source, doing it twice makes things faster?
+    esp_vfs_fat_sdcard_unmount(MOUNT_POINT, card);
+    card = NULL;
+    spi_bus_free(host_slot);
+
+    ESP_LOGE(TAG, "unmounted, now remounting");
+    vTaskDelay(pdMS_TO_TICKS(20));
+
+    TRY(setup_spi_and_mount());
 
     return SDCard();
 }
