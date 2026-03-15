@@ -16,7 +16,7 @@ static const char *TAG = "computer";
 namespace seds {
 
 Expected<std::monostate> FlightComputer::init() {
-    char data[] = "timestamp, accel x, accel y, accel z, degrees x, degrees y, degrees z, baro 1 temp, baro 1 pressure, baro 2 temp, baro 2 pressure, high g accel x, high g accel y, high g accel z, temp\n";
+    //char data[] = "timestamp, accel x, accel y, accel z, degrees x, degrees y, degrees z, baro 1 temp, baro 1 pressure, baro 2 temp, baro 2 pressure, high g accel x, high g accel y, high g accel z, temp\n";
     // test different filenames
     bool broke = false;
     struct stat st;
@@ -24,7 +24,7 @@ Expected<std::monostate> FlightComputer::init() {
         // should write SD functions for this
         // TODO
         // also improve interface so we dont have to do what we do in process()
-        snprintf(this->filename, FlightComputer::buf_len, "%s/data%d.csv", MOUNT_POINT, i);
+        snprintf(this->filename, FlightComputer::buf_len, "%s/data%d.raw", MOUNT_POINT, i);
         ESP_LOGI("computer", "filename: %s, res: %d", this->filename, stat(this->filename, &st));
         if (stat(this->filename, &st) == -1) {
             // doesn't exist, we go with it
@@ -34,11 +34,12 @@ Expected<std::monostate> FlightComputer::init() {
     } 
     
     if (!broke) {
-        strcpy(this->filename, MOUNT_POINT"/data.csv");
+        strcpy(this->filename, MOUNT_POINT"/data.raw");
     }
     ESP_LOGI("computer", "filename: %s", this->filename);
 
-    return this->sd.create_file(this->filename, (uint8_t *)data, sizeof(data)-1); // subtract one
+    char data[] = ""; // no header
+    return this->sd.create_file(this->filename, (uint8_t*)data, 0);//(uint8_t *)data, sizeof(data)-1); // subtract one
 }
 
 constexpr size_t LOOPS_BEFORE_FLUSH = 24;
@@ -46,6 +47,18 @@ const size_t MAX_BLOCK_SIZE = (40 + 14 * 20 + 13 + 1 + 1);
 constexpr size_t BUF_LEN = VFS_DMA_BUF_PREFERRED_KB * 1024; //chunk_bytes; 
 static_assert(BUF_LEN >= LOOPS_BEFORE_FLUSH * MAX_BLOCK_SIZE, "chunk bytes not enough to store specified buf size");
 char* buffers[2];
+
+// write_size 1000 -> max gap 116, average gap 28.8
+// write_size 2000 -> max gap 200, average gap 27.6
+
+struct FCData {
+    int32_t time_ms;
+    IMUData imu_data;
+    BarometerData baro_1_data;
+    BarometerData baro_2_data;
+    HighGAccelData high_g_data;
+    float temp_data;
+};
 
 void FlightComputer::process(uint32_t times, bool endless) {
     struct timeval tv_now;
@@ -63,7 +76,7 @@ void FlightComputer::process(uint32_t times, bool endless) {
         .buffers = {(uint8_t*)buffers[0], (uint8_t*)buffers[1]},
         .insert_idxs = idxs,
         .which_buffer = &which_buf,
-        .write_size = 1000,
+        .write_size = 750,
     };
     TaskHandle_t handle = unwrap(this->sd.create_log_task(args));
 
@@ -114,15 +127,31 @@ void FlightComputer::process(uint32_t times, bool endless) {
         auto idx = &idxs[which_buf.load(std::memory_order_relaxed)];
 
         // newline in front ensures that even if we cutoff a line, we still keep the right division
+        struct FCData data = {
+            .time_ms = (int32_t)time_ms,
+            .imu_data = imu_data,
+            .baro_1_data = baro_1_data,
+            .baro_2_data = baro_2_data,
+            .high_g_data = high_g_data,
+            .temp_data = tmp
+        };
+
+        memcpy(&buffers[which_buf.load(std::memory_order_relaxed)][idx->load(std::memory_order_relaxed)], &data, sizeof(FCData));
+        size_t inc = sizeof(FCData);
+        
+        /*
         size_t inc = snprintf(&buffers[which_buf.load(std::memory_order_relaxed)][idx->load(std::memory_order_relaxed)], MAX_BLOCK_SIZE, "\n%lld,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g",
             time_ms,
             imu_data.ax, imu_data.ay, imu_data.az, imu_data.gx, imu_data.gy, imu_data.gz,
             baro_1_data.baro_temp, baro_1_data.pressure, baro_2_data.baro_temp, baro_2_data.pressure,
             high_g_data.h_ax, high_g_data.h_ay, high_g_data.h_az, tmp
         );
+
+        
         ESP_LOGI(TAG, "%lld: which: %zu, idx: %zu,  %.*s", 
             time_ms, which_buf.load(std::memory_order_relaxed), idx->load(std::memory_order_relaxed),
             inc, &buffers[which_buf.load(std::memory_order_relaxed)][idx->load(std::memory_order_relaxed)] );
+        */
         
         idx->fetch_add(inc, std::memory_order_acq_rel);
         

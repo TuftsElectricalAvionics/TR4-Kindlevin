@@ -128,7 +128,7 @@ void logging_task(void *arg_ptr) {
         if (insert_idx > remove_idxs[which]) { 
             size_t write_size = std::min(insert_idx - remove_idxs[which], args.write_size);
             ESP_LOGI("sd_log_task", "%lld: which: %zu, idx: %zu", time_ms, which, remove_idxs[which]);
-            ESP_LOGI("sd_log_task", "%.*s", write_size, &args.buffers[which][remove_idxs[which]]);
+            //ESP_LOGI("sd_log_task", "%.*s", write_size, &args.buffers[which][remove_idxs[which]]);
 
             fwrite(&args.buffers[which][remove_idxs[which]], 1, write_size, file);
 
