@@ -160,45 +160,7 @@ void FlightComputer::process(uint32_t times, bool endless) {
         
         // no room left
         if (BUF_LEN - idx->load(std::memory_order_relaxed) <= MAX_BLOCK_SIZE) {
-
-
             ESP_LOGI(TAG, "FLUSHING");
-            ESP_LOGI(TAG, "SUSPENDING OTHER TASK");
-
-            // ensure the other task has done its sd stuff
-            //while (xSemaphoreTake(sd_semaphore, pdMS_TO_TICKS(30)) != pdTRUE) {}
-
-            sd_req.store(true, std::memory_order_seq_cst);
-            while(writing.load(std::memory_order_seq_cst)) {
-                // spin
-                vTaskDelay(pdMS_TO_TICKS(10));
-            };
-
-
-            ESP_LOGI(TAG, "AQCUIRED SEMAPHORE!");
-            // accurate compare threads by preventing other thread from catching up while we write
-            vTaskSuspend(handle);
-            ESP_LOGI(TAG, "SUSPENDED OTHER TASK");
-            
-            errno = 0;
-            size_t write_idx = (size_t)idx->load(std::memory_order_seq_cst);
-            ESP_LOGI(TAG, "Writing at idx %u", write_idx);
-            fwrite((void *)buffers[which_buf.load(std::memory_order_relaxed)], 1, write_idx, f);
-            if (errno != 0) {
-                ESP_LOGE(TAG, "err: %s", strerror(errno));
-            }
-            errno = 0;
-            fflush(f);
-            if (errno != 0) {
-                ESP_LOGE(TAG, "err: %s", strerror(errno));
-            }
-            errno = 0;
-            fsync(fileno(f));
-            if (errno != 0) {
-                ESP_LOGE(TAG, "err: %s", strerror(errno));
-            }
-
-            ESP_LOGI(TAG, "sd write successful");
 
             size_t next_which = (which_buf.load(std::memory_order_relaxed) + 1) % 2;
             auto next_idx = &idxs[next_which];
@@ -206,12 +168,7 @@ void FlightComputer::process(uint32_t times, bool endless) {
             which_buf.store(next_which, std::memory_order_seq_cst);
 
             ESP_LOGI(TAG, "RESUMING OTHER TASK");
-            sd_req.store(false, std::memory_order_seq_cst);
-            vTaskResume(handle);
         }
-
-        // allow printing task to overtake for now
-        //vTaskDelay(pdMS_TO_TICKS(150));
     }
 }
 
