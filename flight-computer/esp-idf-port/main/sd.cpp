@@ -114,34 +114,28 @@ void logging_task(void *arg_ptr) {
     struct timeval tv_now;
     size_t prev_which = 1;
     while (true) {
-        if (!args.sd_sem->load(std::memory_order_seq_cst)) {
-            args.write_sem->store(true, std::memory_order_seq_cst);
-            // write to other buffer
-            size_t which = (args.which_buffer->load(std::memory_order_relaxed) + 1) % 2;
+        // write to other buffer
+        size_t which = (args.which_buffer->load(std::memory_order_relaxed) + 1) % 2;
 
-            gettimeofday(&tv_now, NULL);
-            int64_t time_ms = (int64_t)tv_now.tv_sec * 1000L + (int64_t)tv_now.tv_usec / 1000L;
+        gettimeofday(&tv_now, NULL);
+        int64_t time_ms = (int64_t)tv_now.tv_sec * 1000L + (int64_t)tv_now.tv_usec / 1000L;
 
-            size_t insert_idx = args.insert_idxs[which].load(std::memory_order_relaxed); // prevent changing out from under us
-            if (prev_which != which) {
-                remove_idxs[which] = 0;
-                prev_which = which;
-            }
-            if (insert_idx > remove_idxs[which]) { 
-                size_t write_size = std::min(insert_idx - remove_idxs[which], args.write_size);
-                ESP_LOGI("sd_log_task", "%lld: which: %zu, idx: %zu", time_ms, which, remove_idxs[which]);
-                ESP_LOGI("sd_log_task", "%.*s", write_size, &args.buffers[which][remove_idxs[which]]);
+        size_t insert_idx = args.insert_idxs[which].load(std::memory_order_relaxed); // prevent changing out from under us
+        if (prev_which != which) {
+            remove_idxs[which] = 0;
+            prev_which = which;
+        }
+        if (insert_idx > remove_idxs[which]) { 
+            size_t write_size = std::min(insert_idx - remove_idxs[which], args.write_size);
+            ESP_LOGI("sd_log_task", "%lld: which: %zu, idx: %zu", time_ms, which, remove_idxs[which]);
+            ESP_LOGI("sd_log_task", "%.*s", write_size, &args.buffers[which][remove_idxs[which]]);
 
-                fwrite(&args.buffers[which][remove_idxs[which]], 1, write_size, file);
+            fwrite(&args.buffers[which][remove_idxs[which]], 1, write_size, file);
 
-                fflush(file);
-                fsync(fileno(file));
-                remove_idxs[which] += write_size;
-            }
-            args.write_sem->store(false, std::memory_order_seq_cst);
-       } else {
-            args.write_sem->store(false, std::memory_order_seq_cst);
-       }
+            fflush(file);
+            fsync(fileno(file));
+            remove_idxs[which] += write_size;
+        }
     }
 }
 

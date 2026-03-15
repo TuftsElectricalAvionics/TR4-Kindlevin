@@ -47,10 +47,8 @@ namespace seds {
         const char* path;
         uint8_t* buffers[2];
         std::atomic<size_t> *insert_idxs;
-        std::atomic<size_t> *which_buffer; // make an enum when this is stablized
+        std::atomic<size_t> *which_buffer;
         size_t write_size;
-        std::atomic<bool> *sd_sem;
-        std::atomic<bool> *write_sem;
     };  
 
     class SDCard {

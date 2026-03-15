@@ -48,9 +48,6 @@ static_assert(BUF_LEN >= LOOPS_BEFORE_FLUSH * MAX_BLOCK_SIZE, "chunk bytes not e
 char* buffers[2];
 
 void FlightComputer::process(uint32_t times, bool endless) {
-    std::atomic<bool> sd_req = {false};
-    std::atomic<bool> writing = {false};
-
     struct timeval tv_now;
     buffers[0] = (char *)heap_caps_aligned_alloc(32, BUF_LEN, MALLOC_CAP_DMA);
     buffers[1] = (char *)heap_caps_aligned_alloc(32, BUF_LEN, MALLOC_CAP_DMA);
@@ -60,42 +57,13 @@ void FlightComputer::process(uint32_t times, bool endless) {
     std::atomic<size_t> idxs[2] = {{0}, {0}};
     std::atomic<size_t> which_buf = {0};
 
-    char data[] = "timestamp, accel x, accel y, accel z, degrees x, degrees y, degrees z, baro 1 temp, baro 1 pressure, baro 2 temp, baro 2 pressure, high g accel x, high g accel y, high g accel z, temp\n";
-    auto err = this->sd.create_file(MOUNT_POINT"/test1.csv", (uint8_t *)data, sizeof(data)-1);
-
-    if (!err.has_value()) {
-        ESP_LOGE(TAG, "critical error when creating test file: %s", err.error()->what());
-    }
-
-    FILE* f = fopen(MOUNT_POINT"/test1.csv", "a");
-
-    uint8_t *stdio_buf = NULL;
-    size_t bytes = VFS_STDIO_BUF_PREFERRED_KB * 1024;
-    stdio_buf = (uint8_t *)heap_caps_aligned_alloc(32, bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
-
-    if (stdio_buf) {
-        setvbuf(f, (char *)stdio_buf, _IOFBF, bytes);
-    } else {
-        ESP_LOGE(TAG, "NO INTERNAL STDIO BUFFER");
-        fclose(f);
-        return;
-    }
-
-    if (f == NULL) {
-        ESP_LOGE(TAG, "file pointer was null!");
-    }
-
-
     // spawn other task
-    // change back to this->filename once we're done testing!
     struct log_args args = {
         .path = this->filename,
         .buffers = {(uint8_t*)buffers[0], (uint8_t*)buffers[1]},
         .insert_idxs = idxs,
         .which_buffer = &which_buf,
         .write_size = 1000,
-        .sd_sem = &sd_req,
-        .write_sem = &writing
     };
     TaskHandle_t handle = unwrap(this->sd.create_log_task(args));
 
