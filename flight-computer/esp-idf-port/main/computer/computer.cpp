@@ -41,7 +41,7 @@ Expected<std::monostate> FlightComputer::init() {
     return this->sd.create_file(this->filename, (uint8_t *)data, sizeof(data)-1); // subtract one
 }
 
-constexpr size_t LOOPS_BEFORE_FLUSH = 75;
+constexpr size_t LOOPS_BEFORE_FLUSH = 200;
 const size_t MAX_BLOCK_SIZE = (40 + 14 * 20 + 13 + 1 + 1);
 constexpr size_t BUF_LEN = LOOPS_BEFORE_FLUSH * MAX_BLOCK_SIZE; //chunk_bytes; 
 static_assert(BUF_LEN >= LOOPS_BEFORE_FLUSH * MAX_BLOCK_SIZE, "chunk bytes not enough to store specified buf size");

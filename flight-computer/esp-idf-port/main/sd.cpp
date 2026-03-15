@@ -23,6 +23,7 @@ namespace seds {
 
 Expected<void> setup_spi_and_mount() {
     host = SDSPI_HOST_DEFAULT();
+    host.max_freq_khz = 26000;
     host_slot = (spi_host_device_t)host.slot;
 
     bus_cfg = {
