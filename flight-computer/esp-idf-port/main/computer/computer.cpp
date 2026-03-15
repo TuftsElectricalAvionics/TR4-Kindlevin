@@ -48,9 +48,7 @@ constexpr size_t BUF_LEN = VFS_DMA_BUF_PREFERRED_KB * 1024; //chunk_bytes;
 static_assert(BUF_LEN >= LOOPS_BEFORE_FLUSH * MAX_BLOCK_SIZE, "chunk bytes not enough to store specified buf size");
 char* buffers[2];
 
-// write_size 1000 -> max gap 116, average gap 28.8
-// write_size 2000 -> max gap 200, average gap 27.6
-
+// write_size 750 -> max gap 119, average gap 9.5
 struct FCData {
     int32_t time_ms;
     IMUData imu_data;
@@ -76,7 +74,7 @@ void FlightComputer::process(uint32_t times, bool endless) {
         .buffers = {(uint8_t*)buffers[0], (uint8_t*)buffers[1]},
         .insert_idxs = idxs,
         .which_buffer = &which_buf,
-        .write_size = 750,
+        .write_size = 500,
     };
     TaskHandle_t handle = unwrap(this->sd.create_log_task(args));
 
