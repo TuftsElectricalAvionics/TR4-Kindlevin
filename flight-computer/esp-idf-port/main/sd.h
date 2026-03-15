@@ -24,6 +24,9 @@ const gpio_num_t PIN_NUM_CS = (gpio_num_t)5;
 const size_t SAFE_DMA_BUF_PREFERRED_KB = 32;
 const size_t chunk_bytes = SAFE_DMA_BUF_PREFERRED_KB * 1024;
 
+const size_t VFS_STDIO_BUF_PREFERRED_KB = 32;  // Preferred stdio buffer size
+const size_t VFS_DMA_BUF_PREFERRED_KB = 8;     // Preferred DMA buffer size
+
 // Normally, making a constant is preferred to using a definition
 // Here, we want a definition for a specific purpose
 // When a user wants to create a file, they must specify the path, including the mount path

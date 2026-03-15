@@ -41,9 +41,9 @@ Expected<std::monostate> FlightComputer::init() {
     return this->sd.create_file(this->filename, (uint8_t *)data, sizeof(data)-1); // subtract one
 }
 
-constexpr size_t LOOPS_BEFORE_FLUSH = 200;
+constexpr size_t LOOPS_BEFORE_FLUSH = 24;
 const size_t MAX_BLOCK_SIZE = (40 + 14 * 20 + 13 + 1 + 1);
-constexpr size_t BUF_LEN = LOOPS_BEFORE_FLUSH * MAX_BLOCK_SIZE; //chunk_bytes; 
+constexpr size_t BUF_LEN = VFS_DMA_BUF_PREFERRED_KB * 1024; //chunk_bytes; 
 static_assert(BUF_LEN >= LOOPS_BEFORE_FLUSH * MAX_BLOCK_SIZE, "chunk bytes not enough to store specified buf size");
 char* buffers[2];
 
@@ -69,6 +69,18 @@ void FlightComputer::process(uint32_t times, bool endless) {
 
     FILE* f = fopen(MOUNT_POINT"/test1.csv", "a");
 
+    uint8_t *stdio_buf = NULL;
+    size_t bytes = VFS_STDIO_BUF_PREFERRED_KB * 1024;
+    stdio_buf = (uint8_t *)heap_caps_aligned_alloc(32, bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
+
+    if (stdio_buf) {
+        setvbuf(f, (char *)stdio_buf, _IOFBF, bytes);
+    } else {
+        ESP_LOGE(TAG, "NO INTERNAL STDIO BUFFER");
+        fclose(f);
+        return;
+    }
+
     if (f == NULL) {
         ESP_LOGE(TAG, "file pointer was null!");
     }
@@ -81,7 +93,7 @@ void FlightComputer::process(uint32_t times, bool endless) {
         .buffers = {(uint8_t*)buffers[0], (uint8_t*)buffers[1]},
         .insert_idxs = idxs,
         .which_buffer = &which_buf,
-        .write_size = 5000,
+        .write_size = 1000,
         .sd_sem = &sd_req,
         .write_sem = &writing
     };

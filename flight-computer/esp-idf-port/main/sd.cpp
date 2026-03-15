@@ -95,10 +95,24 @@ struct log_args_inner {
 void logging_task(void *arg_ptr) {
     struct log_args_inner args_in = *(struct log_args_inner *)arg_ptr;
     FILE* file = args_in.file;
+
+    uint8_t *stdio_buf = NULL;
+    size_t bytes = VFS_STDIO_BUF_PREFERRED_KB * 1024;
+    stdio_buf = (uint8_t *)heap_caps_aligned_alloc(32, bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
+
+    if (stdio_buf) {
+        setvbuf(file, (char *)stdio_buf, _IOFBF, bytes);
+    } else {
+        ESP_LOGE(TAG, "NO INTERNAL STDIO BUFFER");
+        fclose(file);
+        return;
+    }
+
     struct log_args args = args_in.args;
 
     size_t remove_idxs[2] = {0, 0};
     struct timeval tv_now;
+    size_t prev_which = 1;
     while (true) {
         if (!args.sd_sem->load(std::memory_order_seq_cst)) {
             args.write_sem->store(true, std::memory_order_seq_cst);
@@ -109,8 +123,9 @@ void logging_task(void *arg_ptr) {
             int64_t time_ms = (int64_t)tv_now.tv_sec * 1000L + (int64_t)tv_now.tv_usec / 1000L;
 
             size_t insert_idx = args.insert_idxs[which].load(std::memory_order_relaxed); // prevent changing out from under us
-            if (insert_idx < remove_idxs[which]) {
+            if (prev_which != which) {
                 remove_idxs[which] = 0;
+                prev_which = which;
             }
             if (insert_idx > remove_idxs[which]) { 
                 size_t write_size = std::min(insert_idx - remove_idxs[which], args.write_size);
